@@ -1,0 +1,9 @@
+[project]
+name = "emporio-da-musica"
+version = "0.1.0"
+requires-python = ">=3.13,<3.14"
+dependencies = []
+[project.optional-dependencies]
+dev = [
+    "pip-tools==7.6.2",
+]
