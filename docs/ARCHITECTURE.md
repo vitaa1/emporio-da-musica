@@ -1,6 +1,6 @@
 # Architecture and Scope
 
-Status: planning baseline, recorded on 2026-11-02. No application components described here are implemented yet. This document records the user's architectural direction; detailed contract defaults and unresolved policy interpretations remain proposals until implemented and reviewed.
+Status: planning baseline, recorded on 2026-11-02. No application components described here are implemented yet. This document records the user's architectural direction; detailed contract defaults remain proposals. P03 below records conservative policy decisions for subsequent implementation and review.
 
 ## Objective and requirements
 
@@ -55,18 +55,43 @@ Implement these clear rules first:
 - Estimated delivery is not actual receipt. Unknown receipt date or purchase channel remains unknown.
 - Assessment never means cancellation, refund, reservation, or complaint routing has occurred.
 
-| Open decision or limitation | Safe initial behavior |
+### Policy decisions for implementation (P03 / issue #4)
+
+Recorded on 2026-11-02. These are prototype implementation decisions, not changes to store policy or claims of implemented functionality. References below were checked against the text of all eight pages of the supplied `políticas_da_loja.pdf`, version 2.1, June 2025, on 2026-11-02. The original remains outside the repository. The manual confirms the ambiguities recorded in the [source audit](../CONTEXT.md#store-policies-and-unresolved-ambiguities); the choices below distinguish explicit rules from prototype assumptions. This verifies the supplied source, not its legal correctness.
+
+| Case and source | Chosen behavior | Rationale and limitation |
+| --- | --- | --- |
+| Credit installment summary versus detailed bands (§§3, 3.1) | Prefer §3.1 for explicit requests of 4–6 installments (BRL 80 minimum each) and 7–12 (BRL 100 minimum each). Requests for 2–3 installments require confirmation because the BRL 50 exception is unclear. Do not infer a minimum for that band. | The detailed section is more specific than the general BRL 100 summary. This is a documented interpretation; the original wording confirms the conflicting summary and detailed bands. A general answer must not promise every purchase can use 12 installments. |
+| Combined payment (§3) | Recognize the request and return `requires_confirmation`; do not calculate a split or commit payment terms. | The manual allows combinations above BRL 2,000, but allocation and discount interaction are not defined. The threshold alone does not establish a supported quote. |
+| Freight exactly BRL 500 (§5) | Return `requires_confirmation` for an otherwise eligible local quote at exactly BRL 500. | Neither the above nor below rule covers equality; do not silently choose free freight or BRL 35. |
+| Local delivery region (§5) | Initially support only a customer-declared destination city of Campo Grande/MS. Other cities require confirmation of region eligibility. Ask for destination when absent; do not substitute a customer's recorded city for the delivery address. | Including the store's own city is an explicit prototype assumption. No metropolitan municipality list or postal-code mapping is supplied. Normalize case/accents only; do not infer geography from a postal code. |
+| Freight subtotal (§§3, 5, 6) | Compare BRL 500 against the sum of supported item totals after applicable discounts, before freight. Require products, quantities, and payment conditions sufficient to calculate that subtotal. | This is an implementation assumption because the manual does not define the comparison basis. Missing basket quantities are not defaulted to one. For the supported city, below BRL 500 costs BRL 35; above is free. |
+| External or special freight (§5) | Exact outside-region/carrier quotations are `unavailable`. A city whose region membership is unknown first requires confirmation. | There is no carrier integration, product weight/dimension coverage, or supported quotation capability. Collecting a postal code alone cannot make an exact quote possible. Manual transit ranges may be described as general estimates, never a promised arrival date. |
+| Preference-exchange starting event (§4.3) | Individual preference assessments return `requires_confirmation` for the start of the seven-day period, even if purchase and receipt dates are known. | Selecting purchase or receipt would invent a policy. General explanations can state the seven-day wording and the unresolved starting event. Stock and condition remain relevant but cannot resolve this ambiguity. |
+| Conflicting phone/email (cover/company table, §7) | Publish neither conflicting phone nor email as the authoritative contact. A contact request returns `requires_confirmation` and explains that the supplied manual conflicts. | No source establishes precedence. Do not invent a channel, claim a transfer, or ask the customer to select the official contact. A reviewed source correction is needed. |
+| Simulated customer identity (§9; architecture safeguard) | A future CLI startup option selects a known fixture customer outside the model and conversation. Validate it against loaded records; an unknown supplied identity fails startup. With no identity, catalog/policy routes remain usable but order access is `unauthorized`. Identity stays fixed until a new session. | This demonstrates access scoping, not authentication. A message, email, order number, or model field cannot establish identity. Use reviewed challenge data or synthetic records, minimize exposed fields, and render foreign/nonexistent orders consistently. |
+
+### Clock and calendar
+
+Use the IANA store timezone `America/Campo_Grande`, based on the supplied store location, independently of the developer's timezone. Inject a timezone-aware clock into date-dependent application logic; convert its instant to the store timezone before deriving today's date. Tests provide a fixed instant, including cases on either side of local midnight. Reject naive clock values rather than assigning an implicit timezone. Ensure timezone data is available on every supported platform when this is implemented.
+
+Resolve relative customer dates against that clock only when their meaning is unambiguous. Otherwise ask for an explicit date. Reject future dates asserted as past receipt; an order delivery estimate never establishes receipt. Preserve customer-declared dates separately from verified records. For a known starting date, use calendar-date differences, with elapsed day zero on that date and the stated last day included. This day-count convention is a prototype assumption, not legal advice; it does not resolve the missing start event for preference exchanges.
+
+Regular hours remain Monday–Friday 09:00–18:00 and Saturday 09:00–13:00, closed Sundays/holidays (§2). No holiday calendar, special hours, dispatch calendar, or business-hour counting convention is supplied. State regular hours and any manual business-day ranges with their limitations; do not calculate exact reopening, arrival, refund, or complaint-response deadlines. The current date alone cannot prove the store is open.
+
+### Supported operation boundary
+
+This table defines the implementation scope for later issues; no runtime operations are available in P03. Use the statuses defined in [CONTRACT.md](CONTRACT.md#operation-results).
+
+| Classification | Cases |
 | --- | --- |
-| Installment summary conflicts with detailed bands; BRL 50 exception is unclear | Document section precedence and an interpretation before implementing affected calculations; otherwise request confirmation. |
-| Freight at exactly BRL 500 is unspecified | Request confirmation for that boundary. |
-| Metropolitan-area membership is not defined | Do not infer it from an arbitrary city; document supported destinations. |
-| External freight requires destination, weight, dimensions, and quotation capability | Explain limits; return unavailable for an exact unsupported quote. |
-| Preference-exchange seven-day starting event is unspecified | Request confirmation before a definitive assessment. |
-| Receipt date, channel, item condition, customization, and final-sale designation are absent | Ask only relevant missing questions; label customer declarations as unverified. |
-| Phone/email differ across manual sections | Record conflict and select a documented contact policy before publishing a contact answer. |
-| Holidays and special opening hours are absent | State regular hours; avoid unsupported exact reopening promises. |
-| Promotions have no date range | Use the supplied active flag, not the current month. |
-| Manufacturer warranty is not product-specific in the data | Refer to the certificate; do not invent a period. |
+| Supported once implemented | Snapshot catalog queries, active/stock availability, nonstacking promotion/PIX calculations, historical order lookup scoped to the simulated session, supported installment bands and Campo Grande freight, and general explanations grounded in the manual. Withdrawal/defect assessments use relevant known or explicitly declared facts and assess conditions only. |
+| `needs_information` | Missing or ambiguous product/order selection, destination, basket quantity, payment conditions, purchase channel, actual receipt, or relevant product-condition facts. Ask only for facts needed by the pending operation. |
+| `requires_confirmation` | Ambiguous installment band, combined payment, exact BRL 500 local freight, unknown metropolitan eligibility, preference-exchange start event, conflicting contacts, or another policy judgment reserved for management (§10). State the need for confirmation without claiming it was requested from a person. |
+| `unavailable` | Exact external freight, live inventory/carrier updates, payment execution, refund, cancellation, reservation, complaint registration, human transfer, and production authentication. Acknowledging or assessing a request does not perform it. |
+| `unauthorized` | Order access without an established simulated identity. For an established identity, foreign and nonexistent order references share a nonrevealing external response. |
+
+Missing manufacturer-specific warranty periods remain unknown (§8); refer to the product certificate without inventing coverage. Active promotion flags govern the snapshot (§6), not today's month. Promotions do not imply final-sale exclusions (§4.4). Negative availability or assessment is a successful business result, not a technical failure. Errors must not produce fallback prices or invented policy facts.
 
 The manual's legal statements were not independently reviewed. Treat them as supplied challenge material, not as verified legal guidance. Section 10 provides for management confirmation when policy application is uncertain.
 

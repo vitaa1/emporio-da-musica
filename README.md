@@ -9,7 +9,13 @@ The application is currently in planning; only the development environment is im
 - [GitHub milestones and ready-to-copy issues](docs/GITHUB_PLAN.md)
 - [Project handoff and source analysis](CONTEXT.md)
 
-These documents describe planned behavior, not available application commands. Detailed contract defaults and unresolved policy interpretations remain proposals.
+These documents describe planned behavior, not available application commands. Detailed contract defaults remain proposals. Architecture now records P03 policy decisions and explicit deferrals; these were checked against the supplied manual, but runtime rules are not implemented yet.
+
+## Prototype policy assumptions
+
+The challenge permits reasonable documented interpretations. For implementation, prefer the detailed installment bands over the payment summary; defer the ambiguous 2–3 installment band and combined-payment calculations for confirmation. Initially support local freight only for a declared Campo Grande/MS destination, using item totals after applicable discounts and before freight; exactly BRL 500 requires confirmation. Other metropolitan destinations, the preference-exchange starting event, and conflicting contact details also require confirmation. These decisions and their source references are detailed in [architecture](docs/ARCHITECTURE.md#policy-decisions-for-implementation-p03--issue-4).
+
+Order access will use an explicitly simulated identity fixed outside model output. Date calculations will use an injected clock in `America/Campo_Grande`, with the starting date as day zero and the final calendar day included. Missing holiday data prevents exact business-day deadlines. These are prototype boundaries, not implemented features, production authentication, or authorization to perform refunds or other transactions.
 
 ## Development environment
 

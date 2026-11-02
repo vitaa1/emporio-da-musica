@@ -58,11 +58,13 @@ Milestone: M1. Suggested labels: `docs`, `domain`. Dependencies: none beyond sou
 
 **Scope:** Resolve or explicitly defer installment ambiguity, exact BRL 500 freight, supported delivery regions, conflicting contacts, preference-exchange timing, and simulated customer identity. Use documented reasonable assumptions where appropriate; do not block unrelated work on every ambiguity.
 
+Local documentation completed on 2026-11-02 in `docs/ARCHITECTURE.md`. Source references were checked against the original eight-page manual; its ambiguities remain explicitly deferred. GitHub issue #4 remains open pending review/publication.
+
 **Acceptance criteria**
-- [ ] Each ambiguity has a source reference, chosen behavior, rationale, and limitation.
-- [ ] Supported versus confirmation-only/unavailable cases are listed.
-- [ ] Store timezone, clock injection, and missing holiday/calendar behavior are defined.
-- [ ] No unsupported claim of real authentication, live data, refund, or complaint routing appears in the scope.
+- [x] Each ambiguity has a source reference, chosen behavior, rationale, and limitation.
+- [x] Supported versus confirmation-only/unavailable cases are listed.
+- [x] Store timezone, clock injection, and missing holiday/calendar behavior are defined.
+- [x] No unsupported claim of real authentication, live data, refund, or complaint routing appears in the scope.
 
 ## P04 — Load and validate the supplied CSV data in memory
 

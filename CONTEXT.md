@@ -47,15 +47,15 @@ This verifies setup and tooling, not application behavior. Python installation f
 
 README contains setup, dependency generation, formatting, optional editor guidance, and verification. AGENTS.md contains contributor instructions. Architecture, contracts, and milestone planning are in `docs/`; source analysis below preserves findings from earlier work. Some proposal sections are explicitly historical and must not override the current architecture.
 
-Read the relevant issue and inspect the current branch/files before proceeding. Do not repeat source analysis or implement the whole backlog automatically. All M0 issues are closed; finish publishing the development reviewers, then select the next M1 issue. No application command is available yet.
+Read the relevant issue and inspect the current branch/files before proceeding. Do not repeat source analysis or implement the whole backlog automatically. All M0 issues are closed. P03 policy decisions are now documented in architecture; review/publish issue #4 before proceeding to P04 on its own branch. No application command is available yet.
 
 ## Challenge sources and requirements
 
 The user is building the Artefact AI Engineer technical challenge: a text-based customer service agent for the fictional Empório da Música store in Campo Grande/MS. It assists the team by answering customers directly. The primary objective is simplicity with complete requirement coverage.
 
-The supplied challenge bundle was inspected outside the repository. Its local download path is intentionally omitted; request the bundle location when data import begins. Reproducible data preparation belongs to P04.
+The supplied challenge bundle was inspected outside the repository. Its local download path is intentionally omitted. The user supplied its Windows location on 2026-11-02 and it was accessible through the WSL mount; application setup must accept a configurable source directory. Reproducible data preparation belongs to P04.
 
-- `desafio_tecnico_ai_eng_artefact.pdf`: three-page assignment, analyzed in full.
+- `desafio_tecnico_ai_eng_artefact.pdf`: three-page assignment, analyzed in full and rechecked from the user-supplied original on 2026-11-02. Its requirements match the current architecture and milestone plan; the deadline is specified only in the recruitment email.
 - `data/políticas_da_loja.pdf`: eight-page internal manual, version 2.1, June 2025, analyzed in full.
 - `data/desafio_tecnico_ai_eng - {categories,customers,order_items,orders,products,promotions}.csv`: all six tables inspected and checked as described below.
 
@@ -176,4 +176,4 @@ At the user's explicit request, the analysis, architecture, contract, and GitHub
 
 P01–P14 are local planning IDs, not GitHub numbers. Known mappings are P01 → #5, P02 → #3, and P03 → #4. Recheck GitHub before registering duplicates. The recruitment deadline remains unknown; no milestone dates were invented. The original architecture analysis did not implement application code.
 
-The next action is to complete the development-reviewer configuration and select the next M1 issue. Update these documents alongside implementation; preserve the distinction between plans and verified behavior.
+P03 documentation was prepared on 2026-11-02 for issue #4. Architecture now defines conservative policy deferrals, supported delivery scope, simulated identity, and the store clock/calendar contract. The text of all eight pages of the original manual was rechecked against these decisions. All six CSV headers and row counts also match the dataset summary; this check did not repeat full record validation or import the files. Next: review/publish P03, then implement P04 using the original source bundle on a separate issue branch. Update these documents alongside implementation; preserve the distinction between plans and verified behavior.
