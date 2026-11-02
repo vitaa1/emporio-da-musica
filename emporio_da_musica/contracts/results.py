@@ -35,6 +35,7 @@ class ProductQuote(Contract):
 
 class CatalogData(Contract):
     products: tuple[ProductQuote, ...]
+    total_matches: PositiveInt | None = None
 
 
 class OrderData(Contract):

@@ -87,7 +87,7 @@ Milestone: M1. Suggested labels: `feature`, `architecture`. Dependencies: P03, P
 
 **Scope:** Implement Pydantic discriminated intents, typed operation results, clarification updates, and session state from CONTRACT.md. Introduce a minimal provider boundary usable by a fake in tests.
 
-Implemented locally for GitHub issue #8 on `feature/domain-contracts`. All 121 tests pass (75 contract tests plus the existing 46); runtime/development pins, CI regeneration, and documentation are updated. Review/publication and remote CI remain pending.
+Merged through PR #17 at `84ee5ae`, completing M1 as confirmed by the user. Includes 75 contract tests plus the existing 46; runtime/development pins, CI regeneration, and documentation are updated.
 
 **Acceptance criteria**
 - [x] Unknown fields/types and unauthorized identity/price inputs are rejected.
@@ -102,12 +102,14 @@ Milestone: M2. Suggested labels: `feature`, `domain`. Dependencies: P04, P05.
 
 **Scope:** Search names/categories with documented case/accent normalization; compute availability and active promotion/PIX pricing. Bound displayed results and preserve their ordering for follow-up selections.
 
+Implemented locally on `feature/catalog-pricing`; 32 new offline tests pass (153 total). Publication and remote CI remain pending. Search/rounding conventions and payment-stage limitations are documented in README.
+
 **Acceptance criteria**
-- [ ] Active stock, zero stock, discontinued stock, and coming-soon stock produce correct distinct results.
-- [ ] Inactive promotions are ignored; PIX never stacks with a promotion.
-- [ ] Budget filtering uses the requested payment condition and consistent rounding.
-- [ ] No-result and ambiguous matches are distinguishable; arbitrary fuzzy matching infrastructure is not required.
-- [ ] Unit tests cover the known dataset edge cases and monetary calculations.
+- [x] Active stock, zero stock, discontinued stock, and coming-soon stock produce correct distinct results.
+- [x] Inactive promotions are ignored; PIX never stacks with a promotion.
+- [x] Budget filtering uses the requested payment condition and consistent rounding.
+- [x] No-result and ambiguous matches are distinguishable; arbitrary fuzzy matching infrastructure is not required.
+- [x] Unit tests cover the known dataset edge cases and monetary calculations.
 
 ## P07 — Build the controller, CLI, and deterministic composer
 

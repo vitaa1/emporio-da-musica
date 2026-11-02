@@ -2,14 +2,14 @@
 
 ## Architecture planning
 
-The development environment, in-memory CSV loader, and typed agent/controller contracts are implemented. The conversational assistant remains planned. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
+The development environment, in-memory CSV loader, typed agent/controller contracts, and catalog search/pricing are implemented. The conversational assistant remains planned. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
 
 - [Architecture, scope, and policy decisions](docs/ARCHITECTURE.md)
 - [Agent–controller contract](docs/CONTRACT.md)
 - [GitHub milestones and ready-to-copy issues](docs/GITHUB_PLAN.md)
 - [Project handoff and source analysis](CONTEXT.md)
 
-These documents distinguish implemented data loading from planned conversational behavior. Contract schemas and their limits are implemented; conversational execution remains planned. Architecture now records P03 policy decisions and explicit deferrals; these were checked against the supplied manual, but runtime rules are not implemented yet.
+These documents distinguish implemented data loading from planned conversational behavior. Contract schemas and their limits are implemented; conversational execution remains planned. Architecture now records P03 policy decisions and explicit deferrals; these were checked against the supplied manual, with catalog availability and nonstacking price rules now implemented.
 
 ## Validate the supplied data (P04)
 
@@ -44,6 +44,18 @@ The loader validates all foreign keys and duplicate keys before returning a snap
 `emporio_da_musica/contracts/` defines strict Pydantic intents, results, clarification updates, and session state. `emporio_da_musica/provider.py` supplies a provider-independent extraction boundary tested with a fake provider. It does not call an LLM or execute business operations yet. See [the contract](docs/CONTRACT.md#implemented-interfaces-and-limits) for payload examples, five-intent limits, missing-quantity behavior, store date handling, and the separation between model proposals and Python-owned identity/prices.
 
 Pydantic validates structure and tzdata supplies the store timezone on all supported platforms. Runtime-only setup uses `.venv/bin/python -m pip install -r requirements.txt`; development setup uses `requirements-dev.txt`, which includes runtime dependencies and pytest/Ruff/pip-tools. No provider credentials are required for the contract tests.
+
+## Catalog search and prices
+
+`emporio_da_musica.catalog.search_catalog(snapshot, ProductSearch(...))` returns a typed result without calling a provider. Search uses case/accent-insensitive substring matching on product names and, separately, category names; repeated whitespace is collapsed and punctuation retained. Both filters must match. No synonyms or fuzzy matching are inferred.
+
+Results are sorted by ascending product ID and limited to five. `CatalogData.total_matches` reports the count before truncation: zero matches return `not_found`, while multiple matches return choices without selecting a product. The future controller must save the actual displayed order for ordinal references. An empty search browses the catalog; empty categories have no results.
+
+Availability requires active status and sufficient stock for the requested quantity. Discontinued and coming-soon statuses override positive stock. Only `available_only=True` filters unavailable products. Missing quantity is treated as a unit-price inquiry with an explicit assumption; this default must not be reused for basket assessments.
+
+Active promotions override the 5% PIX discount (manual §§3, 6), including an active 0% promotion. Inactive promotions are ignored. Multiple active promotions on a matching product require confirmation because precedence is undefined. Prices use Decimal and ROUND_HALF_UP to cents per unit, then multiply by quantity. This rounding convention is a prototype assumption. The budget is inclusive and compares the resulting quantity total, using the requested payment method, before result truncation. Unspecified payment uses list/promotional price with an explicit assumption and no PIX discount.
+
+Combined payment requires confirmation. Installments without a method or with a noncredit method request corrected conditions. Credit requests for 2–3 installments return `requires_confirmation` because the policy is ambiguous. Requests for 4–12 installments return `unavailable` until the payment stage implements the documented bands; no installment eligibility is promised. Quotes for unavailable products are informational snapshot prices, not offers or reservations. The CLI still only validates data; controller, conversational rendering, and provider integration remain subsequent work.
 
 ## Prototype policy assumptions
 
@@ -97,7 +109,7 @@ Python must be 3.13.x and pip must belong to the project environment. The comman
 
 Run from the repository root. Loader tests use small synthetic CSVs in temporary directories; demo tests additionally validate the bundled snapshot and default command. Neither needs the challenge download nor provider credentials. They cover normalization, historical totals, duplicate keys, orphan references, malformed data, optional fields, and the validation command's output and error behavior.
 
-On 2026-11-02, all 121 tests passed locally with Python 3.13.18 and pytest 9.2.0, including the loader, bundled demo, and new contract tests. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
+On 2026-11-02, all 153 tests passed locally with Python 3.13.18 and pytest 9.2.0, including loader, bundled demo, contract, and 32 catalog tests. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
 
 ### Style and formatting
 
