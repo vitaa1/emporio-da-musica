@@ -57,12 +57,17 @@ jobs:
       - name: Verify pip-tools
         run: python -m piptools compile --version
 
+      - name: Lint Python files
+        run: python -m ruff check .
+
+      - name: Check Python formatting
+        run: python -m ruff format --check .
+
       - name: Check dependency file consistency
-        if: runner.os == 'Windows'
-        shell: pwsh
+        if: runner.os == 'Linux'
+        shell: bash
         env:
           CUSTOM_COMPILE_COMMAND: pip-compile --allow-unsafe --extra=dev --output-file=requirements-dev.txt --strip-extras pyproject.toml
         run: |
-          .\.venv\Scripts\python.exe -m piptools compile --extra=dev --allow-unsafe --strip-extras --output-file=requirements-dev.txt pyproject.toml
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .venv/bin/python -m piptools compile --extra=dev --allow-unsafe --strip-extras --output-file=requirements-dev.txt pyproject.toml
           git diff --exit-code -- requirements-dev.txt
