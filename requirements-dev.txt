@@ -10,16 +10,25 @@ click==8.5.0
     # via pip-tools
 colorama==0.4.6
     # via emporio-da-musica (pyproject.toml)
+iniconfig==2.3.1
+    # via pytest
 packaging==26.3
     # via
     #   build
+    #   pytest
     #   wheel
 pip-tools==7.6.2
     # via emporio-da-musica (pyproject.toml)
+pluggy==1.7.0
+    # via pytest
+pygments==2.21.0
+    # via pytest
 pyproject-hooks==1.3.3
     # via
     #   build
     #   pip-tools
+pytest==9.2.0
+    # via emporio-da-musica (pyproject.toml)
 ruff==0.17.3
     # via emporio-da-musica (pyproject.toml)
 wheel==0.48.0

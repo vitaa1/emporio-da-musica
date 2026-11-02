@@ -2,14 +2,34 @@
 
 ## Architecture planning
 
-The application is currently in planning; only the development environment is implemented. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
+The development environment and in-memory CSV loader are implemented. The conversational assistant remains planned. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
 
 - [Architecture, scope, and policy decisions](docs/ARCHITECTURE.md)
 - [Agent–controller contract](docs/CONTRACT.md)
 - [GitHub milestones and ready-to-copy issues](docs/GITHUB_PLAN.md)
 - [Project handoff and source analysis](CONTEXT.md)
 
-These documents describe planned behavior, not available application commands. Detailed contract defaults remain proposals. Architecture now records P03 policy decisions and explicit deferrals; these were checked against the supplied manual, but runtime rules are not implemented yet.
+These documents distinguish implemented data loading from planned conversational behavior. Detailed contract defaults remain proposals. Architecture now records P03 policy decisions and explicit deferrals; these were checked against the supplied manual, but runtime rules are not implemented yet.
+
+## Validate the supplied data (P04)
+
+From the repository root, pass the directory containing the six original CSVs:
+
+```sh
+.venv/bin/python -m emporio_da_musica /path/to/challenge/data
+```
+
+On Windows, use `.\.venv\Scripts\python.exe` with your source directory. On WSL, a Windows source directory is accessible under `/mnt/c/`; quote paths containing spaces. No particular download location is required. Alternatively, place local copies in the ignored `data/` directory and pass `data`. Original challenge files remain external; customer records are not committed. The loader reads originals without modifying them. The PDF is not needed by this command.
+
+Required filenames are `desafio_tecnico_ai_eng - categories.csv`, `desafio_tecnico_ai_eng - products.csv`, `desafio_tecnico_ai_eng - customers.csv`, `desafio_tecnico_ai_eng - orders.csv`, `desafio_tecnico_ai_eng - order_items.csv`, and `desafio_tecnico_ai_eng - promotions.csv`. All must have their supplied header and UTF-8 encoding (an optional BOM is accepted). Column order may vary; missing, duplicate, or additional columns are rejected. Surrounding field whitespace is removed; blank required values and malformed records fail the whole load.
+
+The command prints only table counts on success and exits with status 1 on data errors. The supplied snapshot produces 9 categories, 65 products, 50 customers, 20 orders, 22 order items, and 25 promotions. Counts are audit evidence, not hardcoded validation constraints.
+
+`emporio_da_musica.data.load_snapshot(path)` returns typed records indexed by primary ID (order items by order/product pair), plus products by category, orders by customer, items by order, and promotions by product. IDs and item quantities must be positive integers; stock and amounts may be zero. Amounts use `Decimal`, with at most two decimal places for currency. Percentages are between 0 and 100. Dates must be valid `YYYY-MM-DD` dates. Product specs must be JSON objects; duplicate keys and nonfinite numbers are rejected. Promotion flags accept only `0` and `1`. Only order tracking, estimated delivery, and notes may be blank, becoming `None`.
+
+Known product/order statuses are validated. Historical payment methods preserve `pix`, `debit`, `boleto`, or `credit_1x` through `credit_12x`; loading a recorded payment does not approve current payment conditions. Historical totals are never recomputed. Discontinued/coming-soon stock, empty categories, and inactive promotions remain available as source facts. No stock availability, policy eligibility, or actual receipt is inferred.
+
+The loader validates all foreign keys and duplicate keys before returning a snapshot. Errors identify table, CSV line when available, and field without including source values. Customer and order records are excluded from generated representations. Indexes are internal application data, not an authorization boundary; future order access must enforce the simulated session in Python. The snapshot is mutable in memory and must be treated as read-only by consumers. It is not live inventory or a carrier connection.
 
 ## Prototype policy assumptions
 
@@ -53,7 +73,17 @@ If the interpreter is not on PATH, use `~/.local/bin/python3.13`. Activation is 
 .venv/bin/python -m ruff format --check .
 ```
 
-Python must be 3.13.x and pip must belong to the project environment. There is no application or test suite yet; Ruff may report that no Python files exist. These commands validate tooling, not application behavior.
+Python must be 3.13.x and pip must belong to the project environment. The commands above validate tooling and Python style. Data-loader validation is described above.
+
+### Run deterministic tests
+
+```sh
+.venv/bin/python -m pytest -q
+```
+
+Run from the repository root. Tests use small synthetic CSVs in temporary directories and need neither the challenge download nor provider credentials. They cover normalization, historical totals, duplicate keys, orphan references, malformed data, optional fields, and the validation command's output and error behavior.
+
+On 2026-11-02, all 44 tests passed locally with Python 3.13.18 and pytest 9.2.0. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
 
 ### Style and formatting
 
@@ -102,13 +132,13 @@ Confirm `.venv` no longer exists before creating and installing again. Remove th
 
 ### Continuous integration
 
-Pull requests targeting `main` and pushes to `main` run `setup-python-windows`, `setup-python-linux`, and `setup-python-macos`. Each creates a fresh Python 3.13 environment, installs the pins, runs `pip check`, verifies pip-tools, and checks Ruff lint and formatting. Only Linux regenerates dependencies and compares the result with the committed file.
+Pull requests targeting `main` and pushes to `main` run `setup-python-windows`, `setup-python-linux`, and `setup-python-macos`. Each creates a fresh Python 3.13 environment, installs the pins, runs `pip check`, verifies pip-tools, checks Ruff lint and formatting, and runs `python -m pytest -q`. Only Linux regenerates dependencies and compares the result with the committed file.
 
 Keep all three checks required before merge. No provider credentials are needed. New workflow changes still require a remote CI run before their cross-platform results can be claimed.
 
 ### Local configuration
 
-Virtual environments, backups, Python/Ruff caches, and `.env` files are ignored. Commit `.env.example` only with nonsecret example values.
+Virtual environments, backups, Python/Ruff/pytest caches, local `data/` snapshots, and `.env` files are ignored. Commit `.env.example` only with nonsecret example values.
 
 ## Contributor workflow
 
@@ -120,6 +150,6 @@ See [AGENTS.md](AGENTS.md) for repository conventions. Development skills under 
 
 On 2026-11-02, setup was verified on Ubuntu 24.04.1 under WSL2 with Python 3.13.18. A clean export of commit `74eb53c` was placed in a temporary directory, a new `.venv` was created, and `requirements-dev.txt` was installed without reusing the project's environment.
 
-The commands under **Verify the environment** passed: pip 26.2.2 belonged to the temporary environment, `pip check` reported no broken requirements, pip-tools was 7.6.2, and Ruff was 0.17.3. Regenerating the pins produced a byte-identical file. Ruff found no lint violations; formatting reported one file already formatted. There is no application Python code yet.
+The commands under **Verify the environment** passed: pip 26.2.2 belonged to the temporary environment, `pip check` reported no broken requirements, pip-tools was 7.6.2, and Ruff was 0.17.3. Regenerating the pins produced a byte-identical file. Ruff found no lint violations; formatting reported one file already formatted. At the time of that setup verification, no application Python code existed.
 
 The [CI run for the merged tooling change](https://github.com/vitaa1/emporio-da-musica/actions/runs/41445792754) passed all three platform checks. Windows/macOS verification used hosted runners, not local manual execution. Interpreter installation from scratch, VS Code integration, and application behavior were not tested in this validation. Setup requires an available Python 3.13 interpreter and access to the package index (or suitable cached packages); no LLM credentials are required.

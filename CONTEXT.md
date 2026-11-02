@@ -22,20 +22,22 @@ This document preserves project context for continuing development with Codex CL
 
 - Setup issue #1 is complete. EditorConfig/Ruff issue #5 was merged through PR #6 at commit `74eb53c` and is closed.
 - Issue #3 (P02) covers contributor-workflow validation and documentation synchronization. It was merged through PR #13 at commit `0f7f59f`; issue #3 is closed.
-- Application code, CSV assets, Pydantic contracts, CLI, provider integration, and pytest tests are not implemented. Their behavior remains planned in `docs/ARCHITECTURE.md` and `docs/CONTRACT.md`.
+- P03 (issue #4) was merged through PR #15 at `6a45247`; all three PR checks passed.
+- P04 (issue #7) is implemented locally on `feature/csv-loader`: the standard-library loader and validation command load the original six tables successfully. Pytest 9.2.0 is installed with generated pins; all 44 synthetic tests pass, along with Ruff and pip check. CI now runs deterministic tests on all three platforms; publication and remote checks are pending.
+- Source CSVs remain external. Pydantic intent/result contracts, the conversational CLI, and provider integration remain planned.
 - Create the issue branch before starting each new task. The user has authorized this branch workflow; commits, pushes, and merges still require authorization covering those actions.
 
 ## Python and dependency conventions
 
 Python must satisfy `>=3.13,<3.14`. Linux/WSL with Python 3.13 is the dependency-generation reference, deliberately replacing Windows in PR #6. The README and Linux CI use the same pip-tools generation options and header command. Follow README for executable instructions; never hand-edit generated pins.
 
-Direct development dependencies are pip-tools 7.6.2, Ruff 0.17.3, and colorama 0.4.6. Colorama is declared explicitly to preserve build's Windows dependency in the shared Linux-generated file. Runtime dependencies remain empty; introduce `requirements.txt` with the first runtime dependency. Keep declarations and generated pins together.
+Direct development dependencies are pip-tools 7.6.2, Ruff 0.17.3, pytest 9.2.0, and colorama 0.4.6. Colorama is declared explicitly to preserve build's Windows dependency in the shared Linux-generated file. Runtime dependencies remain empty; introduce `requirements.txt` with the first runtime dependency. Keep declarations and generated pins together.
 
 EditorConfig defines UTF-8, LF, final newline, four-space indentation, two spaces for YAML/JSON, and preserved Markdown trailing spaces. Ruff checks basic errors and import sorting and formats Python at 88 columns. VS Code is optional; README documents WSL and interpreter selection without machine-specific configuration.
 
 ## Continuous integration and verification
 
-Workflow: `.github/workflows/ci.yml`. Pull requests and pushes to `main` create fresh Python 3.13 environments on Windows, Linux, and macOS, install pins, run `pip check`, verify pip-tools, and run Ruff lint/format checks. Only Linux regenerates requirements and checks for differences. Matrix fail-fast is disabled; jobs use read-only repository permissions and ten-minute timeouts.
+Workflow: `.github/workflows/ci.yml`. Pull requests and pushes to `main` create fresh Python 3.13 environments on Windows, Linux, and macOS, install pins, run `pip check`, verify pip-tools, run Ruff lint/format checks, and execute `python -m pytest -q`. Only Linux regenerates requirements and checks for differences. Matrix fail-fast is disabled; jobs use read-only repository permissions and ten-minute timeouts.
 
 Required check names remain `setup-python-windows`, `setup-python-linux`, and `setup-python-macos`; these were independently verified in the active main ruleset. The [post-merge CI run](https://github.com/vitaa1/emporio-da-musica/actions/runs/41445792754) passed all three checks for `74eb53c`.
 
@@ -47,7 +49,7 @@ This verifies setup and tooling, not application behavior. Python installation f
 
 README contains setup, dependency generation, formatting, optional editor guidance, and verification. AGENTS.md contains contributor instructions. Architecture, contracts, and milestone planning are in `docs/`; source analysis below preserves findings from earlier work. Some proposal sections are explicitly historical and must not override the current architecture.
 
-Read the relevant issue and inspect the current branch/files before proceeding. Do not repeat source analysis or implement the whole backlog automatically. All M0 issues are closed. P03 policy decisions are now documented in architecture; review/publish issue #4 before proceeding to P04 on its own branch. No application command is available yet.
+Read the relevant issue and inspect the current branch/files before proceeding. Do not repeat source analysis or implement the whole backlog automatically. All M0 issues are closed. P03 is merged. Review/publish P04 on its dedicated branch; the README documents its data-validation command.
 
 ## Challenge sources and requirements
 
@@ -164,7 +166,7 @@ Before implementation, settle the initial feature scope, document interpretation
 
 The user proposed this baseline: CLI → LLM intent identification → Python controller → query/business functions → response composition. The LLM receives the manual for general policy explanations; the controller validates inputs, requests missing information, and authorizes operations. Critical values, stock, errors, order information, and clarification questions are rendered directly by Python without model rewriting.
 
-Chosen planning direction: one agent, no orchestration framework, CSVs loaded in memory (no initial SQLite), Pydantic for contracts, session-only history, sequential multi-intent execution respecting dependencies, pytest for rules/controller, and separate model evaluations. The provider/model, detailed policy assumptions, and some contract defaults remain open. No application components are implemented yet; development tooling is implemented as described above.
+Chosen planning direction: one agent, no orchestration framework, CSVs loaded in memory (no initial SQLite), Pydantic for contracts, session-only history, sequential multi-intent execution respecting dependencies, pytest for rules/controller, and separate model evaluations. The provider/model, detailed policy assumptions, and some contract defaults remain open. The P04 data loader is implemented; conversational components remain planned.
 
 The proposed contract includes typed intents for catalog, order status, payment, freight, returns, general policies, complaints, out-of-scope messages, and small talk. Results distinguish success, not found, missing information, confirmation required, unauthorized, unavailable, and technical error. Pending clarification updates are narrowly scoped; model output never controls customer authorization or authoritative prices. General policy explanations may use a separate call only for that route, with source-section validation and separate semantic evaluation.
 
@@ -176,4 +178,4 @@ At the user's explicit request, the analysis, architecture, contract, and GitHub
 
 P01–P14 are local planning IDs, not GitHub numbers. Known mappings are P01 → #5, P02 → #3, and P03 → #4. Recheck GitHub before registering duplicates. The recruitment deadline remains unknown; no milestone dates were invented. The original architecture analysis did not implement application code.
 
-P03 documentation was prepared on 2026-11-02 for issue #4. Architecture now defines conservative policy deferrals, supported delivery scope, simulated identity, and the store clock/calendar contract. The text of all eight pages of the original manual was rechecked against these decisions. All six CSV headers and row counts also match the dataset summary; this check did not repeat full record validation or import the files. Next: review/publish P03, then implement P04 using the original source bundle on a separate issue branch. Update these documents alongside implementation; preserve the distinction between plans and verified behavior.
+P03 documentation was prepared on 2026-11-02 for issue #4. Architecture now defines conservative policy deferrals, supported delivery scope, simulated identity, and the store clock/calendar contract. The text of all eight pages of the original manual was rechecked against these decisions. All six CSV headers and row counts also match the dataset summary; this check did not repeat full record validation or import the files. P03 has since merged through PR #15. P04 now loads and validates the original bundle successfully. Its 44 synthetic tests pass with pytest 9.2.0; dependency pins and CI test execution are configured. Review/publication and remote CI remain pending. Update these documents alongside implementation; preserve the distinction between plans and verified behavior.

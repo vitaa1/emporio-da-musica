@@ -58,7 +58,7 @@ Milestone: M1. Suggested labels: `docs`, `domain`. Dependencies: none beyond sou
 
 **Scope:** Resolve or explicitly defer installment ambiguity, exact BRL 500 freight, supported delivery regions, conflicting contacts, preference-exchange timing, and simulated customer identity. Use documented reasonable assumptions where appropriate; do not block unrelated work on every ambiguity.
 
-Local documentation completed on 2026-11-02 in `docs/ARCHITECTURE.md`. Source references were checked against the original eight-page manual; its ambiguities remain explicitly deferred. GitHub issue #4 remains open pending review/publication.
+Local documentation completed on 2026-11-02 in `docs/ARCHITECTURE.md`. Source references were checked against the original eight-page manual; its ambiguities remain explicitly deferred. Merged through PR #15; GitHub issue #4 is closed.
 
 **Acceptance criteria**
 - [x] Each ambiguity has a source reference, chosen behavior, rationale, and limitation.
@@ -72,12 +72,14 @@ Milestone: M1. Suggested labels: `feature`, `data`. Dependency: P02.
 
 **Scope:** Introduce the package layout and repeatable source-data loading using the standard CSV library. Preserve originals, validate records and relationships, and build in-memory indexes. Add pytest and focused loader tests.
 
+Implemented locally for GitHub issue #7 on `feature/csv-loader`. The original snapshot loads successfully; 44 synthetic tests, Ruff, and pip check pass. Pytest 9.2.0 and generated pins are included; CI runs deterministic tests on all three platforms. Review/publication and remote CI results remain pending.
+
 **Acceptance criteria**
-- [ ] All six tables load with expected relationships; invalid required records produce clear errors.
-- [ ] Amounts, quantities, dates, JSON specs, and optional order fields are normalized explicitly.
-- [ ] Tests cover duplicate IDs, orphan references, malformed values, and allowed missing fields using small synthetic fixtures.
-- [ ] Data location and reproducible preparation are documented; no developer-specific absolute path is required.
-- [ ] No SQLite or external data service is introduced.
+- [x] All six tables load with expected relationships; invalid required records produce clear errors.
+- [x] Amounts, quantities, dates, JSON specs, and optional order fields are normalized explicitly.
+- [x] Tests cover duplicate IDs, orphan references, malformed values, and allowed missing fields using small synthetic fixtures.
+- [x] Data location and reproducible preparation are documented; no developer-specific absolute path is required.
+- [x] No SQLite or external data service is introduced.
 
 ## P05 — Implement typed intents, results, and session contracts
 
