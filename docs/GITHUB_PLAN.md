@@ -72,7 +72,7 @@ Milestone: M1. Suggested labels: `feature`, `data`. Dependency: P02.
 
 **Scope:** Introduce the package layout and repeatable source-data loading using the standard CSV library. Preserve originals, validate records and relationships, and build in-memory indexes. Add pytest and focused loader tests.
 
-Implemented locally for GitHub issue #7 on `feature/csv-loader`. The original and bundled demonstration snapshots load successfully; 46 tests, Ruff, and pip check pass. Pytest 9.2.0 and generated pins are included; CI runs deterministic tests on all three platforms. Review/publication and remote CI results remain pending.
+Merged through PR #16 at `b2d7e8f`; issue #7 is closed. Original and bundled demonstration snapshots load successfully. All 46 tests and the three platform CI checks passed.
 
 **Acceptance criteria**
 - [x] All six tables load with expected relationships; invalid required records produce clear errors.
@@ -87,12 +87,14 @@ Milestone: M1. Suggested labels: `feature`, `architecture`. Dependencies: P03, P
 
 **Scope:** Implement Pydantic discriminated intents, typed operation results, clarification updates, and session state from CONTRACT.md. Introduce a minimal provider boundary usable by a fake in tests.
 
+Implemented locally for GitHub issue #8 on `feature/domain-contracts`. All 121 tests pass (75 contract tests plus the existing 46); runtime/development pins, CI regeneration, and documentation are updated. Review/publication and remote CI remain pending.
+
 **Acceptance criteria**
-- [ ] Unknown fields/types and unauthorized identity/price inputs are rejected.
-- [ ] Intent bounds, quantity defaults, relative dates, and clarification payloads are explicitly defined.
-- [ ] Pending state, customer-declared facts, and verified records remain distinct.
-- [ ] Contract tests cover valid payloads, malformed responses, and attempted state injection.
-- [ ] Required runtime/development dependency outputs are generated and documented.
+- [x] Unknown fields/types and unauthorized identity/price inputs are rejected.
+- [x] Intent bounds, quantity defaults, relative dates, and clarification payloads are explicitly defined.
+- [x] Pending state, customer-declared facts, and verified records remain distinct.
+- [x] Contract tests cover valid payloads, malformed responses, and attempted state injection.
+- [x] Required runtime/development dependency outputs are generated and documented.
 
 ## P06 — Implement catalog search and deterministic price rules
 
