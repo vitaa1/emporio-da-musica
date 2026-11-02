@@ -34,7 +34,7 @@ Defaults such as quantity one for a unit-price inquiry are controller-owned and 
 | `product_search` | query, category, max_price_brl, available_only, quantity, payment_method, installments | Resolve category/name; query, compute conditions, then filter by the requested payment price. |
 | `order_status` | order_id | Query only within the authorized session; ask if order selection is missing. |
 | `payment_options` | product_reference, quantity, payment_method, installments | Resolve product and calculate supported conditions. |
-| `shipping_quote` | product_reference, quantity, destination | Calculate only supported cases; require confirmation or report unavailable otherwise. |
+| `shipping_quote` | product_reference, quantity, destination, payment_method, installments | Calculate only supported cases; require confirmation or report unavailable otherwise. |
 | `return_assessment` | order_id, reason, purchase_channel, received_at, condition | Evaluate supported rules with explicit provenance for declared facts. |
 | `policy_question` | topic, question | Explain general policy; no individual approval or computed quote. |
 | `complaint` | description | Acknowledge and explain the available next step; no false registration/transfer claim. |
@@ -44,6 +44,8 @@ Defaults such as quantity one for a unit-price inquiry are controller-owned and 
 Suggested enums: payment method `pix`, `debit`, `credit`, `boleto`; return reason `withdrawal`, `defect`, `preference`; purchase channel `online`, `in_store`; small-talk kind `greeting`, `thanks`, `goodbye`. Unknown or unsupported values trigger clarification, not coercion into the nearest supported value. Combined payment is recognized as requiring confirmation until explicitly supported.
 
 `product_reference` is either a textual query or a reference to the session's selected product. The controller assigns product IDs after lookup. Destination contains customer-declared city and optional postal code; neither alone proves metropolitan eligibility. Condition contains nullable booleans for original packaging, signs of use, complete accessories/manuals, and reported customization/final-sale notice. Preserve uncertainty rather than defaulting missing booleans to false.
+
+For `shipping_quote`, preserve explicitly supplied payment conditions because the freight threshold uses the subtotal after applicable discounts. Python may reuse a validated quote only when product, quantity, and payment conditions match the current request; otherwise it recalculates or asks for missing conditions. Shipping clarification updates may supply `payment_method` and `installments`, as well as product reference, quantity, and destination, only when requested by the pending operation. Changes invalidate the dependent subtotal and freight calculation.
 
 The controller determines required fields per case, not all possible fields for every intent. For example, a general return-policy question does not require an order ID. A case-specific return assessment cannot become a general answer merely to bypass missing facts.
 
