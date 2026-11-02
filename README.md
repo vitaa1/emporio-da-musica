@@ -1,5 +1,16 @@
 # Empório da Música
 
+## Architecture planning
+
+The application is currently in planning; only the development environment is implemented. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
+
+- [Architecture, scope, and policy decisions](docs/ARCHITECTURE.md)
+- [Agent–controller contract](docs/CONTRACT.md)
+- [GitHub milestones and ready-to-copy issues](docs/GITHUB_PLAN.md)
+- [Project handoff and source analysis](CONTEXT.md)
+
+These documents describe planned behavior, not available application commands. Detailed contract defaults and unresolved policy interpretations remain proposals.
+
 ## Development environment
 
 Use Python 3.13 with a project-local virtual environment. Development and dependency generation use Linux/WSL (Ubuntu); CI also checks installation on Windows and macOS. Keep Windows and Linux environments separate.
@@ -51,6 +62,12 @@ To apply formatting and safe lint fixes, then review the diff:
 .venv/bin/python -m ruff format .
 ```
 
+### Optional VS Code workflow
+
+Open the repository from a WSL terminal with `code .` when VS Code's [WSL support](https://code.visualstudio.com/docs/remote/wsl) is installed. Confirm the window is connected to WSL, then use **Python: Select Interpreter** to choose the project's `.venv/bin/python`; see [Python environments](https://code.visualstudio.com/docs/python/environments). Do not select a Windows interpreter for this checkout.
+
+EditorConfig support and the Ruff extension are optional conveniences. The terminal commands above remain the source of truth. No `.vscode` files or machine-specific interpreter paths are required or committed.
+
 ### Generate dependencies
 
 `pyproject.toml` declares direct dependencies; `requirements-dev.txt` pins development dependencies and their transitive dependencies. Runtime dependencies are empty. Introduce `requirements.txt` with the first runtime dependency.
@@ -86,3 +103,17 @@ Keep all three checks required before merge. No provider credentials are needed.
 ### Local configuration
 
 Virtual environments, backups, Python/Ruff caches, and `.env` files are ignored. Commit `.env.example` only with nonsecret example values.
+
+## Contributor workflow
+
+Create a dedicated issue branch before changing files; never develop directly on `main`. Keep each PR focused, link its issue, and describe the change, verification, and remaining limitations. Use `docs:`, `chore:`, or `ci:` commit prefixes as appropriate. Review generated pins together with their declarations and require all three CI checks before merge.
+
+See [AGENTS.md](AGENTS.md) for repository conventions. Local skills under `.agents/` and their installer metadata are not required to set up or run the project.
+
+## Setup verification
+
+On 2026-11-02, setup was verified on Ubuntu 24.04.1 under WSL2 with Python 3.13.18. A clean export of commit `74eb53c` was placed in a temporary directory, a new `.venv` was created, and `requirements-dev.txt` was installed without reusing the project's environment.
+
+The commands under **Verify the environment** passed: pip 26.2.2 belonged to the temporary environment, `pip check` reported no broken requirements, pip-tools was 7.6.2, and Ruff was 0.17.3. Regenerating the pins produced a byte-identical file. Ruff found no lint violations; formatting reported one file already formatted. There is no application Python code yet.
+
+The [CI run for the merged tooling change](https://github.com/vitaa1/emporio-da-musica/actions/runs/41445792754) passed all three platform checks. Windows/macOS verification used hosted runners, not local manual execution. Interpreter installation from scratch, VS Code integration, and application behavior were not tested in this validation. Setup requires an available Python 3.13 interpreter and access to the package index (or suitable cached packages); no LLM credentials are required.
