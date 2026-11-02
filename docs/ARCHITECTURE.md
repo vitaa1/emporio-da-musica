@@ -1,6 +1,6 @@
 # Architecture and Scope
 
-Status: planning baseline, recorded on 2026-11-02. The CSV loader, typed contracts, and provider extraction boundary are implemented; business execution and conversational components below remain planned. This document records the user's architectural direction; implemented contract defaults and remaining work are distinguished in CONTRACT.md. P03 below records conservative policy decisions for subsequent implementation and review.
+Status: planning baseline, recorded on 2026-11-02. The CSV loader, typed contracts, and provider extraction boundary are implemented; catalog search and nonstacking pricing are also implemented in `catalog.py`; remaining business execution and conversational components below remain planned. See README for search, rounding, and result-limit conventions. This document records the user's architectural direction; implemented contract defaults and remaining work are distinguished in CONTRACT.md. P03 below records conservative policy decisions for subsequent implementation and review.
 
 ## Objective and requirements
 
