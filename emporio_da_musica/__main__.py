@@ -1,13 +1,19 @@
 """Validate a source directory and print non-sensitive table counts."""
 
 import argparse
+from pathlib import Path
 
 from .data import DataError, load_snapshot
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("data_dir", help="Directory containing the six supplied CSVs")
+    parser.add_argument(
+        "data_dir",
+        nargs="?",
+        default=Path(__file__).resolve().parent.parent / "data" / "demo",
+        help="CSV directory (default: the bundled data/demo snapshot)",
+    )
     args = parser.parse_args()
     try:
         snapshot = load_snapshot(args.data_dir)

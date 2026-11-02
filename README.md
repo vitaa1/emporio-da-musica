@@ -13,13 +13,21 @@ These documents distinguish implemented data loading from planned conversational
 
 ## Validate the supplied data (P04)
 
-From the repository root, pass the directory containing the six original CSVs:
+After installing the development environment, run from the repository root:
+
+```sh
+.venv/bin/python -m emporio_da_musica
+```
+
+The default is the bundled [demonstration snapshot](data/demo/README.md). No original download is needed. It preserves catalog and order scenarios from the challenge while replacing customer names, phones, emails, cities, order notes, and tracking codes with synthetic values. The linked document describes the exact transformations and limitations. This command validates data and prints counts; the conversational agent remains planned.
+
+To validate the original six CSVs instead, supply their directory:
 
 ```sh
 .venv/bin/python -m emporio_da_musica /path/to/challenge/data
 ```
 
-On Windows, use `.\.venv\Scripts\python.exe` with your source directory. On WSL, a Windows source directory is accessible under `/mnt/c/`; quote paths containing spaces. No particular download location is required. Alternatively, place local copies in the ignored `data/` directory and pass `data`. Original challenge files remain external; customer records are not committed. The loader reads originals without modifying them. The PDF is not needed by this command.
+On Windows, use `.\.venv\Scripts\python.exe`. On WSL, a Windows directory is accessible under `/mnt/c/`; quote paths containing spaces. Original files can stay outside the repository or in ignored `data/source/`. Only `data/demo/` is intended for version control. The loader does not modify either dataset. The PDF is not needed by this command.
 
 Required filenames are `desafio_tecnico_ai_eng - categories.csv`, `desafio_tecnico_ai_eng - products.csv`, `desafio_tecnico_ai_eng - customers.csv`, `desafio_tecnico_ai_eng - orders.csv`, `desafio_tecnico_ai_eng - order_items.csv`, and `desafio_tecnico_ai_eng - promotions.csv`. All must have their supplied header and UTF-8 encoding (an optional BOM is accepted). Column order may vary; missing, duplicate, or additional columns are rejected. Surrounding field whitespace is removed; blank required values and malformed records fail the whole load.
 
@@ -81,9 +89,9 @@ Python must be 3.13.x and pip must belong to the project environment. The comman
 .venv/bin/python -m pytest -q
 ```
 
-Run from the repository root. Tests use small synthetic CSVs in temporary directories and need neither the challenge download nor provider credentials. They cover normalization, historical totals, duplicate keys, orphan references, malformed data, optional fields, and the validation command's output and error behavior.
+Run from the repository root. Loader tests use small synthetic CSVs in temporary directories; demo tests additionally validate the bundled snapshot and default command. Neither needs the challenge download nor provider credentials. They cover normalization, historical totals, duplicate keys, orphan references, malformed data, optional fields, and the validation command's output and error behavior.
 
-On 2026-11-02, all 44 tests passed locally with Python 3.13.18 and pytest 9.2.0. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
+On 2026-11-02, all 46 tests passed locally with Python 3.13.18 and pytest 9.2.0. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
 
 ### Style and formatting
 
@@ -138,7 +146,7 @@ Keep all three checks required before merge. No provider credentials are needed.
 
 ### Local configuration
 
-Virtual environments, backups, Python/Ruff/pytest caches, local `data/` snapshots, and `.env` files are ignored. Commit `.env.example` only with nonsecret example values.
+Virtual environments, backups, Python/Ruff/pytest caches, local source snapshots outside `data/demo/`, and `.env` files are ignored. Commit `.env.example` only with nonsecret example values.
 
 ## Contributor workflow
 

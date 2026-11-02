@@ -72,7 +72,7 @@ Milestone: M1. Suggested labels: `feature`, `data`. Dependency: P02.
 
 **Scope:** Introduce the package layout and repeatable source-data loading using the standard CSV library. Preserve originals, validate records and relationships, and build in-memory indexes. Add pytest and focused loader tests.
 
-Implemented locally for GitHub issue #7 on `feature/csv-loader`. The original snapshot loads successfully; 44 synthetic tests, Ruff, and pip check pass. Pytest 9.2.0 and generated pins are included; CI runs deterministic tests on all three platforms. Review/publication and remote CI results remain pending.
+Implemented locally for GitHub issue #7 on `feature/csv-loader`. The original and bundled demonstration snapshots load successfully; 46 tests, Ruff, and pip check pass. Pytest 9.2.0 and generated pins are included; CI runs deterministic tests on all three platforms. Review/publication and remote CI results remain pending.
 
 **Acceptance criteria**
 - [x] All six tables load with expected relationships; invalid required records produce clear errors.

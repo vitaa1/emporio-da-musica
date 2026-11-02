@@ -39,7 +39,7 @@ There is no free-form synthesis after each query. Python composes prices, discou
 
 The six supplied CSVs contain 9 categories, 65 products, 50 customers, 20 orders, 22 order items, and 25 promotions. The manual has eight pages, version 2.1, June 2025. See [CONTEXT.md](../CONTEXT.md#dataset-findings) for paths, schema, counts, checks, and individual findings.
 
-The P04 loader uses standard-library CSV parsing and typed dataclass records; Pydantic intent/result contracts belong to P05. It accepts an explicit source directory and returns all six tables with in-memory indexes only after validation succeeds. Original files remain external and unchanged; tests use synthetic fixtures. See README for supported normalization and invocation.
+The P04 loader uses standard-library CSV parsing and typed dataclass records; Pydantic intent/result contracts belong to P05. It accepts an explicit source directory and returns all six tables with in-memory indexes only after validation succeeds. Original files remain external and unchanged. A derived demonstration snapshot in `data/demo/` replaces customer details, order notes, and tracking codes with synthetic values; it is the default for the validation command. Tests cover small synthetic fixtures and the bundled demonstration. See README for supported normalization and invocation.
 
 Preserve source data and distinguish it from normalized application records. Validate IDs, relationships, numeric values, dates, product specifications, and nullable order fields when loading. Use decimal arithmetic or integer cents for money. Fail clearly on invalid required data; do not silently invent replacements.
 

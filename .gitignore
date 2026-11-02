@@ -13,5 +13,6 @@ __pycache__/
 !.env.example
 
 # Local source snapshots and test caches
-data/
+/data/*
+!/data/demo/
 .pytest_cache/
