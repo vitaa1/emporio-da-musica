@@ -108,7 +108,7 @@ Virtual environments, backups, Python/Ruff caches, and `.env` files are ignored.
 
 Create a dedicated issue branch before changing files; never develop directly on `main`. Keep each PR focused, link its issue, and describe the change, verification, and remaining limitations. Use `docs:`, `chore:`, or `ci:` commit prefixes as appropriate. Review generated pins together with their declarations and require all three CI checks before merge.
 
-See [AGENTS.md](AGENTS.md) for repository conventions. Local skills under `.agents/` and their installer metadata are not required to set up or run the project.
+See [AGENTS.md](AGENTS.md) for repository conventions. Development skills under `.agents/skills/` and `skills-lock.json` are versioned for a shared workflow. They are optional for running the application; see their [source and license](.agents/skills/README.md). The optional [development reviewers](.codex/agents/README.md) are versioned with the repository.
 
 ## Setup verification
 

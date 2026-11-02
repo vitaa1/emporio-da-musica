@@ -21,7 +21,7 @@ This document preserves project context for continuing development with Codex CL
 ## Current project status
 
 - Setup issue #1 is complete. EditorConfig/Ruff issue #5 was merged through PR #6 at commit `74eb53c` and is closed.
-- Issue #3 (P02) covers contributor-workflow validation and documentation synchronization. Its implementation is in `docs/contributor-workflow`; review and merge remain pending.
+- Issue #3 (P02) covers contributor-workflow validation and documentation synchronization. It was merged through PR #13 at commit `0f7f59f`; issue #3 is closed.
 - Application code, CSV assets, Pydantic contracts, CLI, provider integration, and pytest tests are not implemented. Their behavior remains planned in `docs/ARCHITECTURE.md` and `docs/CONTRACT.md`.
 - Create the issue branch before starting each new task. The user has authorized this branch workflow; commits, pushes, and merges still require authorization covering those actions.
 
@@ -47,7 +47,7 @@ This verifies setup and tooling, not application behavior. Python installation f
 
 README contains setup, dependency generation, formatting, optional editor guidance, and verification. AGENTS.md contains contributor instructions. Architecture, contracts, and milestone planning are in `docs/`; source analysis below preserves findings from earlier work. Some proposal sections are explicitly historical and must not override the current architecture.
 
-Read the relevant issue and inspect the current branch/files before proceeding. Do not repeat source analysis or implement the whole backlog automatically. Finish review of #3 before treating M0 as complete; then select the next M1 issue. No application command is available yet.
+Read the relevant issue and inspect the current branch/files before proceeding. Do not repeat source analysis or implement the whole backlog automatically. All M0 issues are closed; finish publishing the development reviewers, then select the next M1 issue. No application command is available yet.
 
 ## Challenge sources and requirements
 
@@ -176,4 +176,4 @@ At the user's explicit request, the analysis, architecture, contract, and GitHub
 
 P01–P14 are local planning IDs, not GitHub numbers. Known mappings are P01 → #5, P02 → #3, and P03 → #4. Recheck GitHub before registering duplicates. The recruitment deadline remains unknown; no milestone dates were invented. The original architecture analysis did not implement application code.
 
-The next action is to review the issue #3 changes and then select the next authorized issue. Update these documents alongside implementation; preserve the distinction between plans and verified behavior.
+The next action is to complete the development-reviewer configuration and select the next M1 issue. Update these documents alongside implementation; preserve the distinction between plans and verified behavior.
