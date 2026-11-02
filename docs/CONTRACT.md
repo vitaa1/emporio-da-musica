@@ -11,7 +11,9 @@ Status: version 1 contracts implemented for issue #8. Pydantic schemas, date res
 | `contracts/dates.py` | Injected aware clock, store date, and receipt-date resolution. |
 | `contracts/results.py` | Discriminated operation results with operation-specific data and status consistency. |
 | `contracts/session.py` | Startup identity validation, bounded session history, provenance, and pending-update allowlists. |
-| `provider.py` | Provider protocol, minimal request context, and one schema-repair attempt; no operation dispatch. |
+| `providers/base.py` | Provider protocol, minimal request context, and provider errors. |
+| `providers/extraction.py` | Validated extraction with one schema-repair attempt; no operation dispatch. |
+| `providers/demo.py` | Offline command-based provider implementing the extraction protocol. |
 | `controller.py` | Sequential catalog execution, actual-record references, scoped pending updates, and sanitized failure handling. |
 | `composer.py` | Portuguese catalog prices, availability, limitations, and focused clarification templates. |
 | `cli.py` | Bounded offline command-based demonstration using a fake provider. |

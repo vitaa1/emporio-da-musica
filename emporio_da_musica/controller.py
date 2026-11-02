@@ -29,14 +29,14 @@ from .contracts.session import (
     SessionState,
     create_session,
 )
-from .data import Snapshot
-from .provider import (
+from .data.records import Snapshot
+from .providers.base import (
     IntentProvider,
     PendingHint,
     ProviderError,
     ProviderRequest,
-    extract_proposal,
 )
+from .providers.extraction import extract_proposal
 
 LOGGER = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ from decimal import Decimal
 
 import pytest
 
-from emporio_da_musica.data import DataError, load_snapshot
+from emporio_da_musica.data.loader import DataError, load_snapshot
 
 
 @pytest.fixture

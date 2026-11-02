@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from .data import DataError, load_snapshot
+from .data.loader import DataError, load_snapshot
 
 
 def main() -> None:

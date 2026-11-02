@@ -5,7 +5,7 @@ from decimal import ROUND_HALF_UP, Decimal, localcontext
 
 from .contracts.intents import ProductSearch
 from .contracts.results import CatalogData, ProductQuote, ProductSearchResult
-from .data import Snapshot
+from .data.records import Snapshot
 
 MAX_CATALOG_RESULTS = 5
 PIX_DISCOUNT_PERCENT = Decimal("5")  # Supplied manual §3.

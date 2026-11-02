@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from pydantic import Field, model_validator
 
-from emporio_da_musica.data import Snapshot
+from emporio_da_musica.data.records import Snapshot
 
 from .common import MAX_HISTORY, MAX_PENDING, Contract, PositiveInt, Text
 from .dates import Clock, store_today

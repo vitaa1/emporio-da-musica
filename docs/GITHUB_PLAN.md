@@ -117,7 +117,9 @@ Milestone: M2. Suggested label: `feature`. Dependencies: P05, P06.
 
 **Scope:** Complete a catalog conversation end to end using a fake provider first. Implement bounded input, session state, structured validation, clarification, sequential execution, and deterministic result rendering.
 
-Implemented locally for issue #10 on `feature/catalog-controller`. Thirty-nine new offline controller/CLI tests pass (192 total). README documents demo commands, reference ordering, pending-work replacement, and deferred real-provider/order/policy behavior. Publication and remote CI remain pending.
+Merged through PR #24 at `7abdaf5`; issue #10 is complete. Includes 39 offline controller/CLI tests (192 total). README documents demo commands, reference ordering, pending-work replacement, and deferred real-provider/order/policy behavior.
+
+Before P08, the user requested a small package reorganization on `refactor/package-organization`: separate CSV records/loading and provider interfaces/extraction/demo, and split controller/CLI/rendering tests. This preserves behavior and all 192 tests; it adds no milestone capability or dependency.
 
 **Acceptance criteria**
 - [x] CLI starts/exits cleanly and supports successive messages in one session.
