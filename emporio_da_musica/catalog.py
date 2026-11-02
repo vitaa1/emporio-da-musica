@@ -26,6 +26,17 @@ def search_catalog(snapshot: Snapshot, intent: ProductSearch) -> ProductSearchRe
     Missing quantity means an explicitly labeled unit-price catalog inquiry only.
     A budget limits the requested quantity's total, after rounding each unit.
     """
+    return _search(snapshot, intent)
+
+
+def quote_product(
+    snapshot: Snapshot, product_id: int, intent: ProductSearch
+) -> ProductSearchResult:
+    """Quote an exact Python-resolved ID, never a model-provided identifier."""
+    return _search(snapshot, intent, product_id=product_id)
+
+
+def _search(snapshot, intent, *, product_id=None):
     if intent.payment_method == "combined":
         return ProductSearchResult(
             status="requires_confirmation",
@@ -72,6 +83,8 @@ def search_catalog(snapshot: Snapshot, intent: ProductSearch) -> ProductSearchRe
     category = normalize(intent.category or "")
     quotes = []
     for product in sorted(snapshot.products.values(), key=lambda p: p.product_id):
+        if product_id is not None and product.product_id != product_id:
+            continue
         if query not in normalize(product.name):
             continue
         if category not in normalize(snapshot.categories[product.category_id].name):

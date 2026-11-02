@@ -2,14 +2,14 @@
 
 ## Architecture planning
 
-The development environment, in-memory CSV loader, typed agent/controller contracts, and catalog search/pricing are implemented. The conversational assistant remains planned. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
+The development environment, in-memory CSV loader, typed agent/controller contracts, catalog search/pricing, and an offline catalog controller/CLI are implemented. Real-model conversation remains planned. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
 
 - [Architecture, scope, and policy decisions](docs/ARCHITECTURE.md)
 - [Agent–controller contract](docs/CONTRACT.md)
 - [GitHub milestones and ready-to-copy issues](docs/GITHUB_PLAN.md)
 - [Project handoff and source analysis](CONTEXT.md)
 
-These documents distinguish implemented data loading from planned conversational behavior. Contract schemas and their limits are implemented; conversational execution remains planned. Architecture now records P03 policy decisions and explicit deferrals; these were checked against the supplied manual, with catalog availability and nonstacking price rules now implemented.
+These documents distinguish implemented data loading from planned conversational behavior. Contract schemas, limits, and offline catalog execution are implemented; real-model interpretation remains planned. Architecture now records P03 policy decisions and explicit deferrals; these were checked against the supplied manual, with catalog availability and nonstacking price rules now implemented.
 
 ## Validate the supplied data (P04)
 
@@ -19,7 +19,7 @@ After installing the development environment, run from the repository root:
 .venv/bin/python -m emporio_da_musica
 ```
 
-The default is the bundled [demonstration snapshot](data/demo/README.md). No original download is needed. It preserves catalog and order scenarios from the challenge while replacing customer names, phones, emails, cities, order notes, and tracking codes with synthetic values. The linked document describes the exact transformations and limitations. This command validates data and prints counts; the conversational agent remains planned.
+The default is the bundled [demonstration snapshot](data/demo/README.md). No original download is needed. It preserves catalog and order scenarios from the challenge while replacing customer names, phones, emails, cities, order notes, and tracking codes with synthetic values. The linked document describes the exact transformations and limitations. This command validates data and prints counts; the separate offline CLI is described below.
 
 To validate the original six CSVs instead, supply their directory:
 
@@ -55,7 +55,35 @@ Availability requires active status and sufficient stock for the requested quant
 
 Active promotions override the 5% PIX discount (manual §§3, 6), including an active 0% promotion. Inactive promotions are ignored. Multiple active promotions on a matching product require confirmation because precedence is undefined. Prices use Decimal and ROUND_HALF_UP to cents per unit, then multiply by quantity. This rounding convention is a prototype assumption. The budget is inclusive and compares the resulting quantity total, using the requested payment method, before result truncation. Unspecified payment uses list/promotional price with an explicit assumption and no PIX discount.
 
-Combined payment requires confirmation. Installments without a method or with a noncredit method request corrected conditions. Credit requests for 2–3 installments return `requires_confirmation` because the policy is ambiguous. Requests for 4–12 installments return `unavailable` until the payment stage implements the documented bands; no installment eligibility is promised. Quotes for unavailable products are informational snapshot prices, not offers or reservations. The CLI still only validates data; controller, conversational rendering, and provider integration remain subsequent work.
+Combined payment requires confirmation. Installments without a method or with a noncredit method request corrected conditions. Credit requests for 2–3 installments return `requires_confirmation` because the policy is ambiguous. Requests for 4–12 installments return `unavailable` until the payment stage implements the documented bands; no installment eligibility is promised. Quotes for unavailable products are informational snapshot prices, not offers or reservations. The separate offline CLI now exposes catalog execution; live provider integration remains subsequent work.
+
+## Offline catalog conversation (issue #10)
+
+Run the command-based demonstration without credentials:
+
+```sh
+.venv/bin/python -m emporio_da_musica.cli --demo
+```
+
+Use `--data-dir /path/to/csvs` to select another validated snapshot. The original `python -m emporio_da_musica` count-only validation command is unchanged. Windows uses `.\.venv\Scripts\python.exe`.
+
+Example inputs, executed against the bundled demo during local tests:
+
+```text
+/buscar Yamaha
+/preco 1 1 pix
+/sair
+```
+
+`/buscar` with no query lists the first five products. `/preco POSITION QUANTITY METHOD` uses the numbered list from the last response; methods are `pix`, `debit`, `credit`, and `boleto`. `/escolher POSITION`, `/quantidade NUMBER`, and `/pagamento METHOD` answer the first pending clarification when that field was requested. `/cancelar` discards unfinished queries, `/ajuda` shows commands, and `/sair`, EOF, or Ctrl+C ends the session. Commands with missing or invalid arguments show usage examples without invoking extraction. Clarification commands without pending work explain how to start a price query; unrequested fields leave pending work unchanged. The demo provider recognizes these explicit commands only; it is not a language model or a natural-language interpreter.
+
+`Controller(snapshot, provider, clock=...)` accepts any provider implementing the existing extraction protocol. `handle(message)` returns deterministic Portuguese text and typed operation results. It validates the complete proposal before dispatch, permits one schema repair, and executes supported catalog/payment-price requests in source order. Payment requests reuse the catalog's supported price rules, require an explicit quantity/payment method, and do not implement installment eligibility. Other operations report unavailable; order requests without startup identity report unauthorized without querying records. There is no live provider or order lookup in this stage.
+
+Selections resolve in Python: an ordinal refers to the actual list shown before the current turn; `selected` may use a preceding unique successful lookup. Search results and successful product quotes in a response share one numbering sequence in first-display order (at most 25 distinct products). Ambiguous, failed, or unsuccessful reference resolution clears the current selection. Exact resolved IDs are quoted without another name search, including when names are duplicated. Each successful quote participates in the displayed list, preserving its selection when an independent search also runs. A quote-only response lists the quoted products; subsequent ordinals refer to that updated list.
+
+Missing facts create at most five pending operations. A scoped clarification updates and revalidates only its target; resolved product IDs remain pinned while quantity/payment facts are collected. An unresolved product still requires an explicit reference update even if an independent lookup selected another product. Other pending operations remain suspended until their own clarification; no dependency graph or automatic retry is inferred. A new complete intent turn replaces earlier pending work; `/cancelar` explicitly cancels it. Corrections to already completed requests are new turns and recompute prices. The response shows successes first, limitations next, and one focused clarification last.
+
+Input is limited to 4,000 characters; the CLI drains an oversized line without interpreting its remainder. History retains at most 20 messages in memory. Full operational output is displayed, but responses exceeding the history field limit are represented by a fixed summary in history. Provider requests contain the ordered displayed names and pending hints, never customer tables or session identity. Logs include only operation/error class identifiers; expected arithmetic, record-lookup, and validation failures cannot produce fallback prices. Unexpected programming errors are not silently swallowed. Product text is rendered without terminal control characters. No persistent session, paid API, dependency, or transaction capability is added.
 
 ## Prototype policy assumptions
 
@@ -109,7 +137,7 @@ Python must be 3.13.x and pip must belong to the project environment. The comman
 
 Run from the repository root. Loader tests use small synthetic CSVs in temporary directories; demo tests additionally validate the bundled snapshot and default command. Neither needs the challenge download nor provider credentials. They cover normalization, historical totals, duplicate keys, orphan references, malformed data, optional fields, and the validation command's output and error behavior.
 
-On 2026-11-02, all 153 tests passed locally with Python 3.13.18 and pytest 9.2.0, including loader, bundled demo, contract, and 32 catalog tests. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
+On 2026-11-02, all 192 tests passed locally with Python 3.13.18 and pytest 9.2.0, including loader, bundled demo, contract, 32 catalog tests, and 39 controller/CLI tests. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
 
 ### Style and formatting
 

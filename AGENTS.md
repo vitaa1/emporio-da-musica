@@ -2,12 +2,13 @@
 
 ## Project Structure & Documentation
 
-The repository contains development tooling, an in-memory CSV loader, typed Pydantic contracts, and offline tests. The conversational assistant remains planned.
+The repository contains development tooling, an in-memory CSV loader, typed Pydantic contracts, an offline catalog controller/CLI, and deterministic tests. Live model integration remains planned.
 
 - `emporio_da_musica/`: CSV records, validation, indexes, and a count-only validation command.
 - `emporio_da_musica/contracts/`: intents, results, dates, and internal session contracts.
 - `emporio_da_musica/provider.py`: provider-independent extraction boundary.
-- `tests/`: synthetic loader, bundled demo, and contract tests.
+- `emporio_da_musica/controller.py`, `composer.py`, and `cli.py`: offline catalog execution, response templates, and demonstration CLI.
+- `tests/`: synthetic loader, bundled demo, contract, catalog, and controller/CLI tests.
 - `pyproject.toml`: Python `>=3.13,<3.14`, metadata, and direct dependencies.
 - `requirements.txt` and `requirements-dev.txt`: generated runtime and development pins.
 - `.github/workflows/ci.yml`: cross-platform setup checks.
