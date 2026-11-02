@@ -1,6 +1,6 @@
 # Architecture and Scope
 
-Status: planning baseline, recorded on 2026-11-02. No application components described here are implemented yet. This document records the user's architectural direction; detailed contract defaults remain proposals. P03 below records conservative policy decisions for subsequent implementation and review.
+Status: planning baseline, recorded on 2026-11-02. The P04 CSV loader is implemented; the conversational components below remain planned. This document records the user's architectural direction; detailed contract defaults remain proposals. P03 below records conservative policy decisions for subsequent implementation and review.
 
 ## Objective and requirements
 
@@ -38,6 +38,8 @@ There is no free-form synthesis after each query. Python composes prices, discou
 ## Data and source audit
 
 The six supplied CSVs contain 9 categories, 65 products, 50 customers, 20 orders, 22 order items, and 25 promotions. The manual has eight pages, version 2.1, June 2025. See [CONTEXT.md](../CONTEXT.md#dataset-findings) for paths, schema, counts, checks, and individual findings.
+
+The P04 loader uses standard-library CSV parsing and typed dataclass records; Pydantic intent/result contracts belong to P05. It accepts an explicit source directory and returns all six tables with in-memory indexes only after validation succeeds. Original files remain external and unchanged. A derived demonstration snapshot in `data/demo/` replaces customer details, order notes, and tracking codes with synthetic values; it is the default for the validation command. Tests cover small synthetic fixtures and the bundled demonstration. See README for supported normalization and invocation.
 
 Preserve source data and distinguish it from normalized application records. Validate IDs, relationships, numeric values, dates, product specifications, and nullable order fields when loading. Use decimal arithmetic or integer cents for money. Fail clearly on invalid required data; do not silently invent replacements.
 
