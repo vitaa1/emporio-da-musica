@@ -2,14 +2,14 @@
 
 ## Architecture planning
 
-The development environment and in-memory CSV loader are implemented. The conversational assistant remains planned. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
+The development environment, in-memory CSV loader, and typed agent/controller contracts are implemented. The conversational assistant remains planned. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
 
 - [Architecture, scope, and policy decisions](docs/ARCHITECTURE.md)
 - [Agent–controller contract](docs/CONTRACT.md)
 - [GitHub milestones and ready-to-copy issues](docs/GITHUB_PLAN.md)
 - [Project handoff and source analysis](CONTEXT.md)
 
-These documents distinguish implemented data loading from planned conversational behavior. Detailed contract defaults remain proposals. Architecture now records P03 policy decisions and explicit deferrals; these were checked against the supplied manual, but runtime rules are not implemented yet.
+These documents distinguish implemented data loading from planned conversational behavior. Contract schemas and their limits are implemented; conversational execution remains planned. Architecture now records P03 policy decisions and explicit deferrals; these were checked against the supplied manual, but runtime rules are not implemented yet.
 
 ## Validate the supplied data (P04)
 
@@ -38,6 +38,12 @@ The command prints only table counts on success and exits with status 1 on data 
 Known product/order statuses are validated. Historical payment methods preserve `pix`, `debit`, `boleto`, or `credit_1x` through `credit_12x`; loading a recorded payment does not approve current payment conditions. Historical totals are never recomputed. Discontinued/coming-soon stock, empty categories, and inactive promotions remain available as source facts. No stock availability, policy eligibility, or actual receipt is inferred.
 
 The loader validates all foreign keys and duplicate keys before returning a snapshot. Errors identify table, CSV line when available, and field without including source values. Customer and order records are excluded from generated representations. Indexes are internal application data, not an authorization boundary; future order access must enforce the simulated session in Python. The snapshot is mutable in memory and must be treated as read-only by consumers. It is not live inventory or a carrier connection.
+
+## Typed agent/controller contracts
+
+`emporio_da_musica/contracts/` defines strict Pydantic intents, results, clarification updates, and session state. `emporio_da_musica/provider.py` supplies a provider-independent extraction boundary tested with a fake provider. It does not call an LLM or execute business operations yet. See [the contract](docs/CONTRACT.md#implemented-interfaces-and-limits) for payload examples, five-intent limits, missing-quantity behavior, store date handling, and the separation between model proposals and Python-owned identity/prices.
+
+Pydantic validates structure and tzdata supplies the store timezone on all supported platforms. Runtime-only setup uses `.venv/bin/python -m pip install -r requirements.txt`; development setup uses `requirements-dev.txt`, which includes runtime dependencies and pytest/Ruff/pip-tools. No provider credentials are required for the contract tests.
 
 ## Prototype policy assumptions
 
@@ -91,7 +97,7 @@ Python must be 3.13.x and pip must belong to the project environment. The comman
 
 Run from the repository root. Loader tests use small synthetic CSVs in temporary directories; demo tests additionally validate the bundled snapshot and default command. Neither needs the challenge download nor provider credentials. They cover normalization, historical totals, duplicate keys, orphan references, malformed data, optional fields, and the validation command's output and error behavior.
 
-On 2026-11-02, all 46 tests passed locally with Python 3.13.18 and pytest 9.2.0. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
+On 2026-11-02, all 121 tests passed locally with Python 3.13.18 and pytest 9.2.0, including the loader, bundled demo, and new contract tests. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
 
 ### Style and formatting
 
@@ -114,13 +120,14 @@ EditorConfig support and the Ruff extension are optional conveniences. The termi
 
 ### Generate dependencies
 
-`pyproject.toml` declares direct dependencies; `requirements-dev.txt` pins development dependencies and their transitive dependencies. Runtime dependencies are empty. Introduce `requirements.txt` with the first runtime dependency.
+`pyproject.toml` declares direct dependencies; `requirements.txt` pins runtime dependencies and `requirements-dev.txt` pins runtime plus development dependencies and their transitive dependencies. Generate both outputs together whenever declarations change.
 
-Linux/WSL with Python 3.13 is now the generation reference, replacing Windows to match the development environment. The Linux CI job regenerates the file and checks for differences; all three platforms still install it and run setup checks. `colorama` is explicitly declared to retain the existing Windows dependency of `build` in this shared file. Review platform-specific dependencies whenever adding tools; a Linux-generated file alone does not guarantee compatibility elsewhere.
+Linux/WSL with Python 3.13 is now the generation reference, replacing Windows to match the development environment. The Linux CI job regenerates both files and checks for differences; all three platforms still install it and run setup checks. `colorama` is explicitly declared to retain the existing Windows dependency of `build` in this shared file. Review platform-specific dependencies whenever adding tools; a Linux-generated file alone does not guarantee compatibility elsewhere.
 
 Generate in the reference environment using the installed pinned pip-tools, without manually editing the output:
 
 ```sh
+CUSTOM_COMPILE_COMMAND='pip-compile --allow-unsafe --output-file=requirements.txt --strip-extras pyproject.toml' .venv/bin/python -m piptools compile --allow-unsafe --strip-extras --output-file=requirements.txt pyproject.toml
 CUSTOM_COMPILE_COMMAND='pip-compile --allow-unsafe --extra=dev --output-file=requirements-dev.txt --strip-extras pyproject.toml' .venv/bin/python -m piptools compile --extra=dev --allow-unsafe --strip-extras --output-file=requirements-dev.txt pyproject.toml
 .venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python -m pip check

@@ -72,5 +72,6 @@ jobs:
         env:
           CUSTOM_COMPILE_COMMAND: pip-compile --allow-unsafe --extra=dev --output-file=requirements-dev.txt --strip-extras pyproject.toml
         run: |
+          CUSTOM_COMPILE_COMMAND='pip-compile --allow-unsafe --output-file=requirements.txt --strip-extras pyproject.toml' .venv/bin/python -m piptools compile --allow-unsafe --strip-extras --output-file=requirements.txt pyproject.toml
           .venv/bin/python -m piptools compile --extra=dev --allow-unsafe --strip-extras --output-file=requirements-dev.txt pyproject.toml
-          git diff --exit-code -- requirements-dev.txt
+          git diff --exit-code -- requirements.txt requirements-dev.txt

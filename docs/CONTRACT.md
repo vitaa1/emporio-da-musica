@@ -1,12 +1,49 @@
 # Agent–Controller Contract
 
-Status: proposed version 1, planning only. This refines the conversation into implementable boundaries; defaults introduced here must be reviewed with their implementation. No schemas or operations exist in code yet.
+Status: version 1 contracts implemented for issue #8. Pydantic schemas, date resolution, scoped pending updates, session construction, and the provider extraction boundary exist in code. Business operations, authorization at query time, the conversational controller, and response composition below remain planned.
+
+## Implemented interfaces and limits
+
+| Module | Implemented responsibility |
+| --- | --- |
+| `contracts/common.py` | Strict, extra-forbidden, frozen model configuration and bounded scalar types. |
+| `contracts/intents.py` | Nine intent variants, complete-turn and clarification schemas, and sanitized JSON parsing. |
+| `contracts/dates.py` | Injected aware clock, store date, and receipt-date resolution. |
+| `contracts/results.py` | Discriminated operation results with operation-specific data and status consistency. |
+| `contracts/session.py` | Startup identity validation, bounded session history, provenance, and pending-update allowlists. |
+| `provider.py` | Provider protocol, minimal request context, and one schema-repair attempt; no operation dispatch. |
+
+The public model-output entry point is `parse_proposal(raw_json, clock=...)`. It accepts only an `IntentTurn` or `ClarificationUpdate`, never session state or an operation result. Python integers and booleans are strict: `true`, `"1"`, and `1.0` are not quantities. Budgets accept nonnegative decimal strings with up to two fractional digits. Missing extracted fields remain `None`; in particular, quantity and availability filters are never inferred by schema defaults. The future controller may use quantity one for a unit-price question only with an explicit quote assumption; basket quantities must be obtained from the customer.
+
+The implemented limits are five intents, 20 history messages, five pending operations, 4,000 characters per text field, and 32,000 UTF-8 bytes per provider response. Limits live in Python, not model output. Empty turns, unknown/extra fields (including nested fields), duplicate JSON keys, and malformed values are rejected. More than five intents raises `RequestTooBroadError`, which bypasses schema repair so the future controller can ask the customer to narrow the request. Other malformed outputs raise `ProposalError("Invalid model proposal")`, without echoing raw inputs. Do not log raw Pydantic `.errors()` payloads, which can contain input values despite sanitized string representations.
+
+`received_at` accepts ISO dates or exactly `today`, `yesterday`, and `day_before_yesterday`; Python resolves these against the injected clock in `America/Campo_Grande`. Other relative/ambiguous expressions must be clarified rather than guessed. A receipt after the store's current date is rejected. The parsed value is a customer-declared date, not a verified receipt. `tzdata` is a runtime dependency to support Windows as well as platforms with a system timezone database. A naive clock is a configuration error, not a model repair opportunity.
+
+A clarification uses this alternative envelope:
+
+```json
+{
+  "pending_id": "controller-issued-id",
+  "update": {
+    "type": "shipping_quote",
+    "payment_method": "pix"
+  }
+}
+```
+
+`PendingOperation.apply_update` checks the pending ID, unchanged intent type, and a nonempty set of explicitly supplied fields against its requested-field allowlist. Null remains unknown. `condition` and `destination` patches merge only supplied nested members, preserving previously declared facts; explicit null clears the object. Other supplied fields replace their prior declaration. The method returns validated declarations, remaining unfilled requested fields, and cleared record references; it does not mutate the old state or execute an operation. Required facts and product/order resolution must be re-evaluated by the future controller before executing dependent calculations. Top-level requested fields authorize their typed nested fields, never arbitrary session updates. Pending IDs are correlation identifiers, not authentication tokens.
+
+Session history is held as a bounded tuple; appending evicts the oldest message. `create_session(snapshot, customer_id)` validates an optional startup-selected simulated identity and rejects unknown/noninteger IDs. Identity is not a provider request/output field and is frozen in the session object. `DeclaredFacts` and `RecordReferences` keep customer declarations and Python-resolved records separate. Selected product IDs must belong to the displayed list. These are internal Python state contracts; query authorization, ordinal resolution, operation cancellation, dependency scheduling, and the conversational CLI are subsequent work. Never deserialize an entire session from model output.
+
+`IntentProvider.propose(ProviderRequest)` returns raw JSON. Requests contain message/history, displayed product names in order, pending-field hints, and a repair flag; they have no customer table, identity, authoritative price, or arbitrary session state field. The caller must minimize any personal data in message/history text. `extract_proposal` validates the response and permits one repair call with the same context and a generic flag. A second invalid response is an error. Provider adapters translate connection/timeouts into `ProviderError`; that error is propagated without schema repair. There is no live provider, timeout implementation, policy invocation, or business dispatch yet.
+
+Results are Python-owned and discriminated by `operation`. Success requires the corresponding typed data and no missing fields; `needs_information` requires missing fields, no data, and a reason code. Other statuses require a reason code and cannot carry data or missing fields. IDs default to Python-generated UUIDs. Catalog/payment data carries explicit quantity, availability, list unit price, promotion, payment condition, final total, and assumptions; order data omits customer details and preserves recorded total plus optional tracking/estimate. Return data contains condition states and provenance, never a refund action. Service results select only operation-appropriate template keys. Policy results validate known section references but do not prove factual grounding. Pydantic checks structure; it does not compute prices, authorize access, or establish policy eligibility.
 
 ## Trust boundary
 
 The LLM proposes intents and extracts explicitly supplied information. The controller resolves records, validates business conditions, determines session access, and executes allowed functions. Pydantic validates structure and types; it does not establish authorization or business correctness.
 
-Each turn produces an object with a nonempty `intents` list. Use a discriminated union on `type` and reject extra fields. Proposed bound: at most five intents per turn; ask the customer to narrow a larger request rather than silently dropping work. Permit one schema-repair attempt without executing invalid proposals, then return a standard error. These limits are configuration, not model decisions.
+Each turn produces an object with a nonempty `intents` list. Use a discriminated union on `type` and reject extra fields. Implemented bound: at most five intents per turn; ask the customer to narrow a larger request rather than silently dropping work. Permit one schema-repair attempt without executing invalid proposals, then return a standard error. These limits are configuration, not model decisions.
 
 ```json
 {
@@ -41,9 +78,9 @@ Defaults such as quantity one for a unit-price inquiry are controller-owned and 
 | `out_of_scope` | topic | Politely redirect to store scope. |
 | `small_talk` | kind | Template greeting, thanks, or goodbye. |
 
-Suggested enums: payment method `pix`, `debit`, `credit`, `boleto`; return reason `withdrawal`, `defect`, `preference`; purchase channel `online`, `in_store`; small-talk kind `greeting`, `thanks`, `goodbye`. Unknown or unsupported values trigger clarification, not coercion into the nearest supported value. Combined payment is recognized as requiring confirmation until explicitly supported.
+Implemented enums: payment method `pix`, `debit`, `credit`, `boleto`, `combined`; return reason `withdrawal`, `defect`, `preference`; purchase channel `online`, `in_store`; small-talk kind `greeting`, `thanks`, `goodbye`. Unknown or unsupported enum values are rejected structurally, never coerced into the nearest supported value. The extraction boundary permits one repair, then reports a stable error; customer-facing clarification belongs to the future controller. Combined payment is recognized as requiring confirmation until explicitly supported.
 
-`product_reference` is either a textual query or a reference to the session's selected product. The controller assigns product IDs after lookup. Destination contains customer-declared city and optional postal code; neither alone proves metropolitan eligibility. Condition contains nullable booleans for original packaging, signs of use, complete accessories/manuals, and reported customization/final-sale notice. Preserve uncertainty rather than defaulting missing booleans to false.
+`product_reference` is a discriminated object: `{"kind":"query","query":"..."}`, `{"kind":"selected"}`, or `{"kind":"ordinal","ordinal":2}` (one-based displayed position). The controller assigns product IDs after lookup. Destination contains nullable customer-declared city, two-letter uppercase state, and postal code (eight digits, with an optional hyphen); neither alone proves metropolitan eligibility. Condition contains nullable booleans for original packaging, signs of use, complete accessories/manuals, and reported customization/final-sale notice. Preserve uncertainty rather than defaulting missing booleans to false.
 
 For `shipping_quote`, preserve explicitly supplied payment conditions because the freight threshold uses the subtotal after applicable discounts. Python may reuse a validated quote only when product, quantity, and payment conditions match the current request; otherwise it recalculates or asks for missing conditions. Shipping clarification updates may supply `payment_method` and `installments`, as well as product reference, quantity, and destination, only when requested by the pending operation. Changes invalidate the dependent subtotal and freight calculation.
 
@@ -108,3 +145,5 @@ Validate structure and known section references. This does not prove semantic co
 Render completed results first, then limitations, then one focused clarification (which may group closely related missing fields). All operational numbers, stock, order facts, errors, and clarification questions are rendered in Python with Brazilian currency/date formatting. General policy prose is a separate block and cannot rewrite operational blocks. Do not display internal IDs/reason codes unnecessarily.
 
 Acceptance examples: available Yamaha lookup plus PIX quote; discontinued product with stock; two-product ambiguity; seven-day return boundary with fixed receipt date; missing receipt date; exactly BRL 500 freight; forbidden discount stacking; foreign order access; model output containing unauthorized extra fields; one failed intent alongside an independent successful lookup.
+
+Implementation references: [Pydantic strict validation](https://docs.pydantic.dev/latest/concepts/strict_mode/) and [discriminated unions](https://docs.pydantic.dev/latest/concepts/unions/).

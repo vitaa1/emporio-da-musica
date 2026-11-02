@@ -2,12 +2,14 @@
 
 ## Project Structure & Documentation
 
-The repository contains development tooling, an in-memory CSV loader, and synthetic loader tests. The conversational assistant and Pydantic intent/result contracts remain planned.
+The repository contains development tooling, an in-memory CSV loader, typed Pydantic contracts, and offline tests. The conversational assistant remains planned.
 
 - `emporio_da_musica/`: CSV records, validation, indexes, and a count-only validation command.
-- `tests/`: synthetic data-loader tests.
+- `emporio_da_musica/contracts/`: intents, results, dates, and internal session contracts.
+- `emporio_da_musica/provider.py`: provider-independent extraction boundary.
+- `tests/`: synthetic loader, bundled demo, and contract tests.
 - `pyproject.toml`: Python `>=3.13,<3.14`, metadata, and direct dependencies.
-- `requirements-dev.txt`: generated dependency pins.
+- `requirements.txt` and `requirements-dev.txt`: generated runtime and development pins.
 - `.github/workflows/ci.yml`: cross-platform setup checks.
 - `README.md`: setup; `CONTEXT.md`: historical context and current handoff. Verify snapshots against actual files.
 
@@ -35,7 +37,7 @@ python3.13 -m venv .venv
 .venv/bin/python -m pytest -q
 ```
 
-Create `.venv` only when absent. Follow README instructions for pip-tools generation in the Linux/WSL reference environment. Never edit generated pins manually; keep them with declaration changes. Introduce `requirements.txt` with the first runtime dependency.
+Create `.venv` only when absent. Follow README instructions for pip-tools generation in the Linux/WSL reference environment. Never edit generated pins manually; keep them with declaration changes. Regenerate both runtime and development dependency outputs when declarations change.
 
 ## Style & Validation
 
@@ -45,6 +47,6 @@ EditorConfig and Ruff are configured; Ruff checks basic errors and import order 
 
 ## Contributions & Local Configuration
 
-Use `docs:`, `chore:`, or `ci:` where appropriate. Create a focused issue branch before any new feature or task; never develop directly on main. Use a descriptive branch name without issue numbers (for example, `feature/csv-loader`). Use PRs; describe behavior, verification, and limitations. Require all three `setup-python-*` checks before merge. Branch creation for new work is authorized by the user. Obtain explicit authorization before installing tools or performing other Git mutations.
+Use `docs:`, `chore:`, or `ci:` where appropriate. Create a focused issue branch before any new feature or task; never develop directly on main. Use a descriptive branch name without issue numbers (for example, `feature/csv-loader`). Use descriptive PR titles without planning codes such as P05; describe behavior, verification, and limitations. Require all three `setup-python-*` checks before merge. Branch creation for new work is authorized by the user. Obtain explicit authorization before installing tools or performing other Git mutations.
 
 Keep secrets, environments, backups, and unnecessary customer data out of commits/logs. Commit only nonsecret `.env.example` values. Keep Windows and Linux environments separate.
