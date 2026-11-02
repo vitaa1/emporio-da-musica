@@ -102,7 +102,7 @@ Milestone: M2. Suggested labels: `feature`, `domain`. Dependencies: P04, P05.
 
 **Scope:** Search names/categories with documented case/accent normalization; compute availability and active promotion/PIX pricing. Bound displayed results and preserve their ordering for follow-up selections.
 
-Implemented locally on `feature/catalog-pricing`; 32 new offline tests pass (153 total). Publication and remote CI remain pending. Search/rounding conventions and payment-stage limitations are documented in README.
+Merged through PR #23 at `4df666e`; issue #9 is complete. Includes 32 catalog tests (153 total at that stage). Search/rounding conventions and payment-stage limitations are documented in README.
 
 **Acceptance criteria**
 - [x] Active stock, zero stock, discontinued stock, and coming-soon stock produce correct distinct results.
@@ -117,13 +117,15 @@ Milestone: M2. Suggested label: `feature`. Dependencies: P05, P06.
 
 **Scope:** Complete a catalog conversation end to end using a fake provider first. Implement bounded input, session state, structured validation, clarification, sequential execution, and deterministic result rendering.
 
+Implemented locally for issue #10 on `feature/catalog-controller`. Thirty-nine new offline controller/CLI tests pass (192 total). README documents demo commands, reference ordering, pending-work replacement, and deferred real-provider/order/policy behavior. Publication and remote CI remain pending.
+
 **Acceptance criteria**
-- [ ] CLI starts/exits cleanly and supports successive messages in one session.
-- [ ] Product selection and corrections resolve against actual displayed records.
-- [ ] Invalid model output executes no operation; repair is bounded and errors are handled.
-- [ ] Independent intents can succeed while dependent ones await clarification.
-- [ ] Prices, stock, errors, and follow-up questions are composed without model rewriting.
-- [ ] Controller tests run offline with fake provider responses.
+- [x] CLI starts/exits cleanly and supports successive messages in one session.
+- [x] Product selection and corrections resolve against actual displayed records.
+- [x] Invalid model output executes no operation; repair is bounded and errors are handled.
+- [x] Independent intents can succeed while dependent ones await clarification.
+- [x] Prices, stock, errors, and follow-up questions are composed without model rewriting.
+- [x] Controller tests run offline with fake provider responses.
 
 ## P08 — Select and integrate one LLM provider
 
