@@ -11,7 +11,3 @@ __pycache__/
 .env
 .env.*
 !.env.example
-
-# Locally installed development skills
-.agents/
-skills-lock.json
