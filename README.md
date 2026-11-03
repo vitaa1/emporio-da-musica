@@ -2,7 +2,7 @@
 
 ## Architecture planning
 
-The development environment, in-memory CSV loader, typed agent/controller contracts, catalog search/pricing, and an offline catalog controller/CLI are implemented. Real-model conversation remains planned. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
+The development environment, in-memory CSV loader, typed agent/controller contracts, catalog search/pricing, and an offline catalog controller/CLI are implemented. Local Ollama model integration is implemented; live quality findings are documented below. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
 
 - [Architecture, scope, and policy decisions](docs/ARCHITECTURE.md)
 - [Agent–controller contract](docs/CONTRACT.md)
@@ -72,6 +72,34 @@ Availability requires active status and sufficient stock for the requested quant
 Active promotions override the 5% PIX discount (manual §§3, 6), including an active 0% promotion. Inactive promotions are ignored. Multiple active promotions on a matching product require confirmation because precedence is undefined. Prices use Decimal and ROUND_HALF_UP to cents per unit, then multiply by quantity. This rounding convention is a prototype assumption. The budget is inclusive and compares the resulting quantity total, using the requested payment method, before result truncation. Unspecified payment uses list/promotional price with an explicit assumption and no PIX discount.
 
 Combined payment requires confirmation. Installments without a method or with a noncredit method request corrected conditions. Credit requests for 2–3 installments return `requires_confirmation` because the policy is ambiguous. Requests for 4–12 installments return `unavailable` until the payment stage implements the documented bands; no installment eligibility is promised. Quotes for unavailable products are informational snapshot prices, not offers or reservations. The separate offline CLI now exposes catalog execution; live provider integration remains subsequent work.
+
+## Local model with Ollama (P08)
+
+Start Ollama with `qwen2.5:3b` installed, then run:
+
+```sh
+export OLLAMA_BASE_URL=http://localhost:11434
+export OLLAMA_MODEL=qwen2.5:3b
+.venv/bin/python -m emporio_da_musica.cli
+```
+
+For Windows-hosted Ollama accessed from WSL, use its reachable Windows address instead of localhost. In the current development session, `http://172.21.64.1:11434` was reachable; that address is machine-specific and may change. `--ollama-url` and `--model` override environment variables. `.env.example` documents nonsecret values; files named `.env` are not loaded automatically. No API key or paid API is used. Keep access to the local server restricted to the intended machine/network.
+
+Type natural language, for example “Mostre violões Yamaha”, then “Quero uma unidade do segundo no PIX”. The `--demo` option retains command-based offline behavior. Catalog lookup and supported price calculations execute in Python; order lookup and general policy answers remain later milestones. Greetings beyond the initial welcome also retain the current unsupported-operation fallback.
+
+The official extraction prompt is versioned in `emporio_da_musica/providers/prompts/extraction.md`. It defines the persona, schema vocabulary, trust boundary, missing-fact handling, references, corrections, four behavioral examples, and three contextual-reference examples. The full manual precedes these instructions. This extraction call returns intents only; general-policy prose remains a separate planned route and cannot rewrite operational results.
+
+The adapter uses the standard library with `/api/chat`, a Pydantic-derived JSON schema, nonstreaming output, temperature zero, a 16,384-token context setting, and a 2,048-token generation limit. Only full-turn proposals are permitted when no pending operation exists. History is additionally bounded to the most recent complete messages totaling 8,000 characters. The full reviewed manual text (eight source pages) is bundled as `providers/store_manual.txt`; `--manual` accepts a reviewed UTF-8 replacement limited to 40,000 characters. This is context for extraction, not authorization to execute the manual's services or publish conflicting contacts.
+
+Requests are capped at 180,000 serialized bytes and responses at 256,000 transport bytes / 32,000 extracted-content bytes. The default socket timeout is 120 seconds (`--timeout`, maximum 600); this is a socket-operation timeout, not a total wall-clock deadline. There are no transport retries. The existing extraction boundary permits one schema-repair call, at most two requests per turn. Redirects and environment HTTP proxies are disabled. Errors, incomplete output, and exhausted generation produce a sanitized failure without fallback prices. Source statements and JSON validity do not prove correct interpretation.
+
+Opt-in live smoke evaluation (not collected by pytest or CI):
+
+```sh
+.venv/bin/python -m evals.ollama --url http://localhost:11434 --model qwen2.5:3b
+```
+
+This uses bundled demonstration records and reports per-case status and latency. With the contextual-reference examples, the latest Qwen run passed all three smoke steps, including PIX totals and quantity correction. Gemma passed search but quoted the wrong product on the second step; its correction step was not executed. Earlier search and quote requests succeeded, while quantity corrections failed semantic checks. The model is configurable; 3B was selected for local operation and modest download size, not a demonstrated quality advantage over alternatives. The same-prompt comparison supports retaining Qwen for this development flow; it does not establish general model superiority. See the recorded live findings in `docs/OLLAMA_EVALUATION.md`.
 
 ## Offline catalog conversation (issue #10)
 
@@ -153,7 +181,7 @@ Python must be 3.13.x and pip must belong to the project environment. The comman
 
 Run from the repository root. Loader tests use small synthetic CSVs in temporary directories; demo tests additionally validate the bundled snapshot and default command. Neither needs the challenge download nor provider credentials. They cover normalization, historical totals, duplicate keys, orphan references, malformed data, optional fields, and the validation command's output and error behavior.
 
-On 2026-11-02, all 192 tests passed locally with Python 3.13.18 and pytest 9.2.0, including loader, bundled demo, contract, 32 catalog tests, and 39 controller/CLI tests. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
+On 2026-11-03, all 209 tests passed locally with Python 3.13.18 and pytest 9.2.0, including loader, bundled demo, contract, 32 catalog tests, 39 controller/CLI tests, and 17 Ollama adapter tests. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
 
 ### Style and formatting
 

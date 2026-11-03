@@ -135,13 +135,15 @@ Milestone: M2. Suggested labels: `feature`, `evaluation`. Dependency: P07.
 
 **Scope:** Select one model/provider based on representative extraction quality, cost, and setup; connect it to the existing boundary. Add persona, structured-output instructions, full reviewed manual context, and three or four behavioral examples.
 
+Implemented locally on `feature/ollama-integration` with Ollama and configurable `qwen2.5:3b`. The natural-language CLI, full extracted manual, structured schemas, offline adapter tests, and opt-in live evaluation exist. The final contextual-reference prompt passed the three-turn Qwen development evaluation, including quantity correction; earlier semantic failures and the Gemma comparison are retained in the report. The review error-handling fixes pass all 209 offline tests. See OLLAMA_EVALUATION.md. Publication, review, and remote CI remain pending.
+
 **Acceptance criteria**
-- [ ] Model choice and observed tradeoffs are documented; model name is configurable.
-- [ ] A real CLI catalog query and follow-up work through the controller.
-- [ ] Secrets use environment variables and a nonsecret example configuration.
-- [ ] Context size/history bounds, timeout, retry limits, and provider-error behavior are explicit.
-- [ ] Prompt examples do not supply authoritative current prices or identity claims.
-- [ ] Live checks are explicit opt-in operations, separate from credential-free CI.
+- [x] Model choice and observed tradeoffs are documented; model name is configurable.
+- [x] A real CLI catalog query and follow-up work through the controller. With contextual-reference examples, Qwen passed search, quote, and quantity correction with expected totals; Gemma selected the wrong product. See the development evaluation and its limits.
+- [x] Secrets use environment variables and a nonsecret example configuration.
+- [x] Context size/history bounds, timeout, retry limits, and provider-error behavior are explicit.
+- [x] Prompt examples do not supply authoritative current prices or identity claims.
+- [x] Live checks are explicit opt-in operations, separate from credential-free CI.
 
 ## P09 — Add session-scoped order lookup
 
