@@ -1,6 +1,6 @@
 # Agent–Controller Contract
 
-Status: version 1 contracts implemented for issue #8. Pydantic schemas, date resolution, scoped pending updates, session construction, and the provider extraction boundary exist in code. Catalog search and nonstacking pricing are implemented in `catalog.py`. The offline catalog controller, CLI, and deterministic composer are implemented for issue #10. A local Ollama adapter is implemented for P08. Session-scoped order lookup is implemented for P09 (issue #12). Other business operations remain planned.
+Status: version 1 contracts implemented for issue #8. Pydantic schemas, date resolution, scoped pending updates, session construction, and the provider extraction boundary exist in code. Catalog search and nonstacking pricing are implemented in `catalog.py`. The offline catalog controller, CLI, and deterministic composer are implemented for issue #10. A local Ollama adapter is implemented for P08. Session-scoped order lookup is implemented for P09 (issue #12). General policy explanations and out-of-scope, small-talk, and complaint templates are implemented as a minimal P12 slice (issue #20). Return, shipping, and installment assessments remain planned.
 
 ## Implemented interfaces and limits
 

@@ -12,6 +12,16 @@ This document preserves project context for continuing development with coding a
 - Work in small, reviewable steps. Do not install tools or perform Git operations without an explicit request covering those actions. File-editing permission alone does not authorize commits, pushes, merges, or branch deletion.
 - Discuss milestones and issues in chat; the user registers them manually. Do not create additional local planning files unless requested. This handoff was explicitly requested.
 - Use a separate branch and pull request for each issue, with required CI checks passing before merge.
+- Do not add AI attribution to commits or PRs: no `Co-Authored-By` trailers and no "Generated with" footers (user decision, 2026-11-03). One earlier commit (`1598c91`, PR #27) carries a Claude co-author trailer; the user chose not to rewrite history. AI usage is disclosed in the README instead (P14).
+- Before committing feature work, the user asks for the three project reviewers on the uncommitted diff: `code_reviewer` and `security_reviewer` (`.codex/agents/*.toml`) and the `diagnosing-bugs` skill (`.agents/skills/`). In Claude Code they run as read-only parallel subagents given the role file. Verify each finding, fix confirmed ones with regression tests, then rerun the live checks.
+
+## Development process so far
+
+Each issue followed: plan from `docs/` → issue branch → implementation with offline tests (FakeProvider) → live `qwen2.5:3b` runs through scratch scripts driving `Controller.handle` → reviewer agents → fixes → docs update → commit/PR after explicit user authorization → user merges → local main sync and branch deletion.
+
+Live testing repeatedly showed that the 3B model produces schema-valid but semantically wrong extractions: copying order numbers or budgets from history, answering clarifications with new turns, wrong categories, instrument types placed in the search term, and misrouting greetings, complaints, or general questions. The approach has been to add prompt examples and, where possible, deterministic Python guards (values must be typed in the current message; same-product carry-over; category/name retries; policy prose checks). Every failed run and its fix is recorded in `docs/OLLAMA_EVALUATION.md`.
+
+Windows-hosted Ollama is reachable from WSL at the Windows host address (`ip route | awk '/default/{print $3}'`, recently `172.21.64.1:11434`), not `localhost`.
 
 ## Repository and environment
 
@@ -21,10 +31,14 @@ This document preserves project context for continuing development with coding a
 ## Current project status
 
 - The official extraction prompt is versioned in `providers/prompts/extraction.md`. With the added contextual-reference examples, Qwen 3B passed the three-turn smoke sequence; Gemma 4B selected the wrong product on the quote step. This is a limited development evaluation, not a general reliability claim. The model default remains unchanged.
-- P08 (issue #11) was merged through PR #26 at `6858b10`; all three PR checks passed and issue #11 is closed. It uses Windows-hosted Ollama with the configurable default `qwen2.5:3b`. The local adapter, full manual context, natural-language CLI, offline transport tests, and opt-in evaluation exist; 209 offline tests pass. See `docs/OLLAMA_EVALUATION.md` for actual results and limitations. The remote `feature/ollama-integration` branch still exists; deleting it requires user authorization.
+- P08 (issue #11) was merged through PR #26 at `6858b10`; all three PR checks passed and issue #11 is closed. It uses Windows-hosted Ollama with the configurable default `qwen2.5:3b`. See `docs/OLLAMA_EVALUATION.md` for actual results and limitations.
 - The package refactor merged through PR #25 at `e0a0aa7`.
 - P09 (issue #12), session-scoped order lookup, merged through PR #28 at `c62720b`; M2 is complete.
-- A minimal P12 slice (policy answers, out-of-scope, small talk, complaints) is implemented on `feature/policy-answers` (278 offline tests; reviews applied; live Qwen sequences passed); publication and remote CI are pending. Next: P10/P11. See the revised order in `docs/GITHUB_PLAN.md`.
+- A minimal P12 slice (policy answers, out-of-scope, small talk, complaints) is in PR #29 from `feature/policy-answers` (278 offline tests; reviews applied; live Qwen sequences passed); remote CI and merge are pending. Issue #20 stays open for the remaining P12 criteria.
+- GitHub issue mapping: P10 → #18, P11 → #19, P12 → #20, P13 → #21, P14 → #22 (all open). M0–M2 are complete.
+- Next: P11 (#19), because "Me arrependi da minha compra, posso devolver meu pedido?" is an assignment example and still returns the unavailable message; then P10 (#18), remaining P12, P13, P14. The recruitment deadline is still unknown.
+- Known pre-existing defects (also on main before P09, not yet fixed): quoting a displayed list item replaces the displayed list with only that product, so a following ordinal may fail; a quote without a product after `/cancelar` clears the selection.
+- A manual test guide was drafted in chat but not saved to the repository.
 
 - Setup issue #1 is complete. EditorConfig/Ruff issue #5 was merged through PR #6 at commit `74eb53c` and is closed.
 - Issue #3 (P02) covers contributor-workflow validation and documentation synchronization. It was merged through PR #13 at commit `0f7f59f`; issue #3 is closed.
@@ -34,7 +48,7 @@ This document preserves project context for continuing development with coding a
 - P06 (issue #9) was merged through PR #23 at `4df666e`; the local main was synchronized after the user confirmed merge and remote branch deletion. Includes 32 catalog tests.
 - P07 (issue #10) was merged through PR #24 at `7abdaf5`. The offline CLI/controller, deterministic composition, and scoped references are covered by 39 tests (192 total). Main was synchronized after user confirmation of merge and remote branch deletion.
 - The package refactor (PR #25) placed records/loader in `data/`, the neutral provider boundary/extraction/demo in `providers/`, and split controller/CLI/rendering test modules. Behavior, commands, and dependency pins were unchanged.
-- Original source CSVs remain external. A derived snapshot in `data/demo/` is bundled for evaluation; customer details, order notes, and tracking codes are synthetic, while catalog facts and order relationships are preserved. The validation command uses this demo by default. Pydantic contracts are implemented locally; order query authorization, remaining business rules, and live provider integration remain planned; the offline catalog CLI is implemented.
+- Original source CSVs remain external. A derived snapshot in `data/demo/` is bundled for evaluation; customer details, order notes, and tracking codes are synthetic, while catalog facts and order relationships are preserved. The validation command uses this demo by default. Catalog, order lookup, Ollama extraction, and (in PR #29) general policy answers are implemented; return assessment, installment/freight rules, consolidated evaluation, and submission materials remain.
 - Create the issue branch before starting each new task. The user has authorized this branch workflow; commits, pushes, and merges still require authorization covering those actions.
 
 ## Python and dependency conventions
