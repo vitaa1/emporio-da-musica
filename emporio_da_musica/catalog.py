@@ -169,6 +169,17 @@ def _search(snapshot, intent, *, product_id=None):
             continue
         installments = intent.installments
         credit = {}
+        if intent.payment_method is None:
+            credit["stock_quantity"] = product.stock_quantity
+            credit["max_installments"] = max_installments(total)
+            credit["pix_total_brl"] = (
+                total
+                if promotion is not None
+                else (product.price_brl * (1 - PIX_DISCOUNT_PERCENT / 100)).quantize(
+                    CENT, rounding=ROUND_HALF_UP
+                )
+                * quantity
+            )
         product_assumptions = assumptions
         if intent.payment_method == "credit":
             if installments is None:

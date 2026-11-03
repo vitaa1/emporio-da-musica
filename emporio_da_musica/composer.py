@@ -124,6 +124,8 @@ CITY_ASSUMED = "City without state assumed to be Campo Grande/MS."
 SMALL_INSTALLMENTS_NOTE = "Parcelar em 2 ou 3 vezes precisa de confirmação da loja."
 
 BUDGET_IGNORED = "O limite de preço não foi reconhecido nesta mensagem e não foi aplicado; informe o valor em números (por exemplo, até R$ 1000)."
+CARD_QUESTION = "Quantas unidades você quer e como prefere pagar?"
+LIST_QUESTION = "Qual modelo te interessa?"
 CATALOG_FOOTER = "Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada."
 ORDER_FOOTER = "Dados do registro histórico do pedido, sem consulta em tempo real à transportadora; nenhuma alteração foi feita."
 
@@ -156,6 +158,71 @@ def render_quote(quote: ProductQuote) -> str:
         parts.append("Sem desconto PIX enquanto o pagamento não for informado.")
     parts.extend(render_installments(quote))
     return " ".join(parts)
+
+
+def render_summary(quote: ProductQuote) -> str:
+    """One list line: enough to choose a model, details come after the choice."""
+    if quote.availability in ("discontinued", "coming_soon"):
+        return f"{safe_text(quote.name)} — {AVAILABILITY[quote.availability]}"
+    if quote.stock_quantity == 0:
+        return f"{safe_text(quote.name)} — sem estoque"
+    price = money(quote.final_total_brl / quote.quantity)
+    if quote.promotion_percent is not None:
+        percent = format(quote.promotion_percent, "f").replace(".", ",")
+        price += f" (promoção de {percent}%)"
+    return f"{safe_text(quote.name)} — {price}"
+
+
+def render_card(quote: ProductQuote) -> str:
+    """Stock, unit price, and every payment option for a chosen model."""
+    if quote.availability in ("discontinued", "coming_soon"):
+        return f"{safe_text(quote.name)} — {AVAILABILITY[quote.availability]}."
+    lines = [
+        safe_text(quote.name),
+        f"Em estoque: {quote.stock_quantity} unidade(s).",
+        f"Preço por unidade: {money(quote.list_unit_price_brl)}.",
+    ]
+    if quote.availability == "insufficient_stock":
+        lines.append("Não há estoque para a quantidade pedida.")
+        return "\n".join(lines)
+    if quote.promotion_percent is not None:
+        percent = format(quote.promotion_percent, "f").replace(".", ",")
+        lines.append(f"Promoção ativa: {percent}%.")
+        pix = "sem desconto adicional sobre a promoção"
+    else:
+        pix = "5% de desconto"
+    total = money(quote.final_total_brl)
+    label = "" if quote.quantity == 1 else f" para {quote.quantity} unidades"
+    lines.append(f"Formas de pagamento{label}:")
+    lines.append(f"- PIX: {money(quote.pix_total_brl)} ({pix})")
+    lines.append(f"- Débito: {total}")
+    lines.append(f"- Boleto: {total}")
+    if quote.max_installments is not None:
+        lines.append(
+            f"- Crédito: até {quote.max_installments}x sem juros, total de {total}"
+        )
+    else:
+        lines.append(f"- Crédito: {total}; parcelar neste valor depende da loja")
+    return "\n".join(lines)
+
+
+def render_guide(data: CatalogData) -> str:
+    guide = data.guide
+    where = f" em {safe_text(guide.category)}" if guide.category else ""
+    lines = [f"Boa escolha! Temos {data.total_matches} opções{where}."]
+    if guide.lowest_price_brl is not None:
+        lines.append(
+            f"Os preços de tabela vão de {money(guide.lowest_price_brl)} a "
+            f"{money(guide.highest_price_brl)}."
+        )
+    if guide.brands:
+        brands = ", ".join(safe_text(brand) for brand in guide.brands)
+        lines.append(f"Algumas marcas: {brands}.")
+    lines.append(
+        "Você tem preferência de marca ou um valor máximo? Se preferir, peça para "
+        "eu mostrar as opções."
+    )
+    return " ".join(lines)
 
 
 def render_installments(quote: ProductQuote) -> list[str]:
@@ -250,11 +317,34 @@ def compose(results, displayed_ids: tuple[int, ...], pending, notes=()) -> str:
     completed, limitations, footers = [], [], []
     for result in results:
         if result.status == "success":
-            if isinstance(result.data, CatalogData):
-                lines = [
-                    f"{displayed_ids.index(q.product_id) + 1}. {render_quote(q)}"
-                    for q in result.data.products
-                ]
+            if isinstance(result.data, CatalogData) and result.data.guide:
+                completed.append(render_guide(result.data))
+            elif isinstance(result.data, CatalogData):
+                products = result.data.products
+                exploring = all(q.payment_method is None for q in products)
+                card = exploring and result.data.total_matches == 1
+                if card:
+                    # Keep the shared numbering when a response shows several items.
+                    number = (
+                        f"{displayed_ids.index(products[0].product_id) + 1}. "
+                        if len(results) > 1
+                        and len(displayed_ids) > 1
+                        and products[0].product_id in displayed_ids
+                        else ""
+                    )
+                    lines = [number + render_card(products[0])]
+                    if not pending and products[0].availability == "available":
+                        lines.append(CARD_QUESTION)
+                elif exploring:
+                    lines = [
+                        f"{displayed_ids.index(q.product_id) + 1}. {render_summary(q)}"
+                        for q in products
+                    ]
+                else:
+                    lines = [
+                        f"{displayed_ids.index(q.product_id) + 1}. {render_quote(q)}"
+                        for q in products
+                    ]
                 if any(CATEGORY_IGNORED in q.assumptions for q in result.data.products):
                     lines.append(
                         "Busca ampliada: o nome e a categoria juntos não tinham resultado."
@@ -263,6 +353,8 @@ def compose(results, displayed_ids: tuple[int, ...], pending, notes=()) -> str:
                     lines.append(
                         f"Mostrando {len(result.data.products)} de {result.data.total_matches} resultados; refine a busca para ver outros."
                     )
+                if exploring and not card:
+                    lines.append(LIST_QUESTION)
                 completed.append("\n".join(lines))
                 footers.append(CATALOG_FOOTER)
             elif isinstance(result.data, ShippingData):

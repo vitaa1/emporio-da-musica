@@ -13,10 +13,13 @@ from pydantic import TypeAdapter
 
 from ..contracts.common import MAX_RESPONSE_BYTES
 from ..contracts.intents import IntentTurn, Proposal
-from .base import ProviderError
+from .base import ProviderConnectionError, ProviderError
 from .policy import PolicyAnswer
 
 SCHEMA = TypeAdapter(Proposal).json_schema()
+
+
+SERVER_CHECK_TIMEOUT = 3
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -53,6 +56,7 @@ class OllamaProvider:
         if len(manual) > 40000:
             raise ValueError("Manual exceeds 40000 characters")
         self.url = base_url.rstrip("/") + "/api/chat"
+        self.tags_url = base_url.rstrip("/") + "/api/tags"
         self.model = model
         self.timeout = timeout
         self.manual = manual
@@ -124,6 +128,21 @@ class OllamaProvider:
             PolicyAnswer.model_json_schema(),
         )
 
+    def check_server(self):
+        """Return "unreachable", "model_missing", or None; unclear answers pass."""
+        try:
+            with self.opener.open(
+                Request(self.tags_url), timeout=SERVER_CHECK_TIMEOUT
+            ) as response:
+                models = json.loads(response.read(256001))["models"]
+            names = {model["name"] for model in models}
+        except OSError:
+            return "unreachable"
+        except (HTTPException, ValueError, KeyError, TypeError, RecursionError):
+            return None
+        wanted = self.model if ":" in self.model else f"{self.model}:latest"
+        return None if wanted in names else "model_missing"
+
     def _chat(self, messages, schema):
         body = {
             "model": self.model,
@@ -156,9 +175,9 @@ class OllamaProvider:
             ):
                 raise ValueError
             return content
+        except (OSError, URLError):
+            raise ProviderConnectionError("Ollama request failed") from None
         except (
-            OSError,
-            URLError,
             HTTPException,
             ValueError,
             KeyError,

@@ -4,7 +4,7 @@ from datetime import date
 from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID, uuid4
 
-from pydantic import Field, TypeAdapter, model_validator
+from pydantic import Field, NonNegativeInt, TypeAdapter, model_validator
 
 from .common import (
     Contract,
@@ -37,11 +37,24 @@ class ProductQuote(Contract):
     first_installment_brl: Money | None = None
     # For credit without a count: the largest count in 4–12 meeting the minimum.
     max_installments: Installments | None = None
+    # Filled when no payment was requested, to present every payment option.
+    stock_quantity: NonNegativeInt | None = None
+    pix_total_brl: Money | None = None
+
+
+class CatalogGuide(Contract):
+    """A broad request answered with a question instead of a long list."""
+
+    category: Text | None = None
+    brands: tuple[Text, ...] = ()
+    lowest_price_brl: Money | None = None
+    highest_price_brl: Money | None = None
 
 
 class CatalogData(Contract):
     products: tuple[ProductQuote, ...]
     total_matches: PositiveInt | None = None
+    guide: CatalogGuide | None = None
 
 
 class OrderData(Contract):

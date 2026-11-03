@@ -28,6 +28,7 @@ from .contracts.intents import (
 )
 from .contracts.results import (
     RESULT_ADAPTER,
+    CatalogGuide,
     ComplaintData,
     ComplaintResult,
     OperationResult,
@@ -56,6 +57,7 @@ from .data.records import Snapshot
 from .providers.base import (
     IntentProvider,
     PendingHint,
+    ProviderConnectionError,
     ProviderError,
     ProviderRequest,
 )
@@ -69,6 +71,199 @@ from .providers.policy import (
 from .returns import REFERENCES, assess_return, required_fields
 
 LOGGER = logging.getLogger(__name__)
+
+MODEL_UNAVAILABLE = (
+    "O serviço de linguagem está indisponível agora, então não li sua mensagem. "
+    "Verifique se o Ollama está em execução e se o endereço (--ollama-url) está "
+    "correto."
+)
+# Typed instrument words, without accents, and the category text each one selects.
+INSTRUMENT_CATEGORIES = {
+    "violao": "Violões",
+    "violoes": "Violões",
+    "guitarra": "Guitarras",
+    "guitarras": "Guitarras",
+    "ukulele": "Ukuleles",
+    "ukuleles": "Ukuleles",
+    "teclado": "Teclados",
+    "teclados": "Teclados",
+    "piano": "Pianos",
+    "pianos": "Pianos",
+    "bateria": "Baterias",
+    "baterias": "Baterias",
+}
+MIN_RECOVERED_TERM_LENGTH = 4
+PURCHASE_WORDS = re.compile(
+    r"\b(quero|queria|querendo|comprar|compra|procuro|procurando|preciso|gostaria"
+    r"|interesse|interessad[oa])\b"
+)
+LIST_WORDS = re.compile(
+    r"\b(liste|listar|lista|mostre|mostrar|mostra|quais|opcoes|todos|todas|catalogo"
+    r"|ver)\b"
+)
+BUDGET_HINT = re.compile(
+    r"\b(ate|menos|abaixo|orcamento|reais|mil)\b|r\$|\b[0-9][0-9.,]*\b"
+)
+BARE_REQUEST_WORDS = {"um", "uma", "o", "a", "de"}
+# Leading product-name words that describe the instrument rather than its brand.
+GENERIC_NAME_WORDS = {"bateria", "teclado", "sintetizador", "piano", "baixo", "kit"}
+MIN_GUIDED_MATCHES = 4
+MAX_GUIDE_BRANDS = 6
+
+
+def _is_broad_request(intent, message):
+    """A purchase wish or a bare instrument word, with no filter to apply yet."""
+    if (
+        intent.query
+        or intent.max_price_brl is not None
+        or intent.quantity is not None
+        or intent.payment_method is not None
+    ):
+        return False
+    text = normalize(message)
+    if LIST_WORDS.search(text):
+        return False
+    words = set(_words(message))
+    if PURCHASE_WORDS.search(text):
+        return True
+    return bool(words & set(INSTRUMENT_CATEGORIES)) and words <= (
+        set(INSTRUMENT_CATEGORIES) | BARE_REQUEST_WORDS
+    )
+
+
+def _rerouted_search(snapshot, intent, message, guided_category, intent_count):
+    """Route two observed model mistakes back to the catalog search."""
+    text = normalize(message)
+    if (
+        isinstance(intent, ProductSearch)
+        and intent_count == 1
+        and ACCESSORY_WORDS.search(text)
+    ):
+        # The store sells no accessories, whatever search the model proposed.
+        return OutOfScope(
+            type="out_of_scope", topic=ACCESSORY_WORDS.search(text).group(0)
+        )
+    if (
+        guided_category
+        and isinstance(intent, PaymentOptions)
+        and intent.product_reference is not None
+        and intent.product_reference.kind == "query"
+        and intent.payment_method is None
+        and not PAYMENT_MENTION.search(text)
+    ):
+        # "Yamaha", answering "which brand?", is a filter and not yet a quote.
+        return ProductSearch(
+            type="product_search", query=intent.product_reference.query
+        )
+    if isinstance(intent, OutOfScope) and intent_count == 1:
+        # "mostre as guitarras" sent out of scope; accessories remain out of scope.
+        named = {
+            INSTRUMENT_CATEGORIES[word]
+            for word in _words(message)
+            if word in INSTRUMENT_CATEGORIES
+            and _category_products(snapshot, INSTRUMENT_CATEGORIES[word])
+        }
+        wanted = LIST_WORDS.search(text) or PURCHASE_WORDS.search(text)
+        if len(named) == 1 and wanted and not ACCESSORY_WORDS.search(text):
+            return ProductSearch(type="product_search", category=named.pop())
+    return intent
+
+
+def _catalog_guide(snapshot, intent):
+    products = (
+        _category_products(snapshot, intent.category)
+        if intent.category
+        else list(snapshot.products.values())
+    )
+    brand_words = {
+        _words(p.name)[0]: p.name.split()[0] for p in snapshot.products.values()
+    }
+    for generic in GENERIC_NAME_WORDS:
+        brand_words.pop(generic, None)
+    brands = []
+    for product in sorted(products, key=lambda p: p.product_id):
+        for word in _words(product.name):
+            brand = brand_words.get(word)
+            if brand and brand not in brands:
+                brands.append(brand)
+                break
+    sellable = [
+        p.price_brl for p in products if p.status == "active" and p.stock_quantity > 0
+    ]
+    names = {snapshot.categories[p.category_id].name for p in products}
+    return CatalogGuide(
+        category=names.pop() if intent.category and len(names) == 1 else None,
+        brands=tuple(brands[:MAX_GUIDE_BRANDS]),
+        lowest_price_brl=min(sellable, default=None),
+        highest_price_brl=max(sellable, default=None),
+    )
+
+
+def _words(text):
+    return re.findall(r"[^\W_]+(?:-[^\W_]+)*", normalize(text))
+
+
+def _category_products(snapshot, category):
+    wanted = normalize(category)
+    ids = {
+        c.category_id
+        for c in snapshot.categories.values()
+        if wanted in normalize(c.name)
+    }
+    return [p for p in snapshot.products.values() if p.category_id in ids]
+
+
+def _checked_search_terms(snapshot, intent, message):
+    """Keep search terms grounded in the customer's words, compared as whole words.
+
+    The model may invent "viola" for "violao" or lose a typed brand. Python only
+    corrects cases the current message settles, and never guesses between options.
+    """
+    typed = _words(message)
+    query, category = intent.query, intent.category
+    named = {
+        INSTRUMENT_CATEGORIES[word]
+        for word in typed
+        if word in INSTRUMENT_CATEGORIES
+        and _category_products(snapshot, INSTRUMENT_CATEGORIES[word])
+    }
+    inferred = next(iter(named)) if len(named) == 1 else None
+    if query and _typed_amounts(query) == {intent.max_price_brl}:
+        # The budget copied into the name would match models such as "FG800".
+        query = None
+    if query and normalize(query) in INSTRUMENT_CATEGORIES:
+        alias = INSTRUMENT_CATEGORIES[normalize(query)]
+        if _category_products(snapshot, alias):
+            query, category = None, category or alias
+    if (
+        query
+        and inferred
+        and not any(
+            normalize(query) in normalize(p.name)
+            for p in _category_products(snapshot, category or inferred)
+        )
+    ):
+        # A price, adjective, or invented word cannot hide the instrument typed.
+        query, category = None, category or inferred
+    if query and not set(_words(query)) <= set(typed):
+        category = category or inferred
+        if category:
+            query = None
+    if not query:
+        category = category or inferred
+    if not query and category:
+        vocabulary = {
+            word
+            for product in _category_products(snapshot, category)
+            for word in _words(product.name)
+            if len(word) >= MIN_RECOVERED_TERM_LENGTH
+        }
+        found = (set(typed) & vocabulary) - set(INSTRUMENT_CATEGORIES)
+        if len(found) == 1:
+            query = found.pop()
+    if (query, category) == (intent.query, intent.category):
+        return intent
+    return intent.model_copy(update={"query": query, "category": category})
 
 
 @dataclass(frozen=True)
@@ -286,6 +481,7 @@ class Controller:
         self.clock = clock
         self.session = create_session(snapshot, customer_id)
         self._typed_order_numbers = set()
+        self._guided_category = None
         self._message = ""
         # Facts of the last successful quote: (product ID, executed intent).
         self._last_quote = None
@@ -328,6 +524,9 @@ class Controller:
             proposal = extract_proposal(self.provider, request, clock=self.clock)
         except RequestTooBroadError:
             return self._finish(message, "Faça até cinco pedidos por mensagem.")
+        except ProviderConnectionError as error:
+            LOGGER.warning("Extraction failed: %s", type(error).__name__)
+            return self._finish(message, MODEL_UNAVAILABLE)
         except (ProposalError, ProviderError) as error:
             LOGGER.warning("Extraction failed: %s", type(error).__name__)
             return self._finish(
@@ -389,23 +588,25 @@ class Controller:
         # Budgets and model-written search terms follow the same rule: values copied
         # from history or invented by the model must not hide or replace products.
         typed_amounts = _typed_amounts(message)
+        guided_category, self._guided_category = self._guided_category, None
         notes = []
         checked = []
         for intent in intents:
+            intent = _rerouted_search(
+                self.snapshot, intent, message, guided_category, len(intents)
+            )
             if isinstance(intent, ProductSearch):
                 if (
                     intent.max_price_brl is not None
                     and intent.max_price_brl not in typed_amounts
                 ):
                     intent = intent.model_copy(update={"max_price_brl": None})
-                    notes.append(BUDGET_IGNORED)
-                if (
-                    intent.query
-                    and intent.category
-                    and normalize(intent.query) not in normalize(message)
-                ):
-                    # e.g. "viola" invented for "violões": keep the typed category.
-                    intent = intent.model_copy(update={"query": None})
+                    if BUDGET_HINT.search(normalize(message)):
+                        notes.append(BUDGET_IGNORED)
+                intent = _checked_search_terms(self.snapshot, intent, message)
+                if not intent.category and guided_category:
+                    # Answering "which brand?" continues the instrument just asked.
+                    intent = intent.model_copy(update={"category": guided_category})
             if isinstance(intent, QUOTES) and _payment_only(intent.product_reference):
                 intent = intent.model_copy(update={"product_reference": None})
             checked.append(intent)
@@ -512,6 +713,26 @@ class Controller:
                 selected_order = (
                     outcome.data.order_id if outcome.status == "success" else None
                 )
+            if (
+                isinstance(intent, PaymentOptions)
+                and outcome.status == "needs_information"
+                and resolved is not None
+                and choices is None
+                and intent.product_reference is not None
+                and intent.payment_method is None
+                and intent.installments is None
+                and not prior
+                and not PAYMENT_MENTION.search(normalize(self._message))
+            ):
+                # A chosen model: show its facts while asking for what is missing.
+                # The card is not a new list, so earlier positions stay valid.
+                card = quote_product(
+                    self.snapshot,
+                    resolved,
+                    ProductSearch(type="product_search", quantity=intent.quantity),
+                )
+                if card.status == "success":
+                    results.append(card)
             results.append(outcome)
             if outcome.status == "needs_information":
                 fields = dict(
@@ -563,6 +784,19 @@ class Controller:
     def _execute(self, intent, selected, original_display, pinned):
         if isinstance(intent, ProductSearch):
             result = search_catalog(self.snapshot, intent)
+            if (
+                result.status == "success"
+                and result.data.total_matches >= MIN_GUIDED_MATCHES
+                and _is_broad_request(intent, self._message)
+            ):
+                self._guided_category = intent.category
+                data = result.data.model_copy(
+                    update={
+                        "products": (),
+                        "guide": _catalog_guide(self.snapshot, intent),
+                    }
+                )
+                result = result.model_copy(update={"data": data})
             return result, result if result.status == "success" else None, None
         if isinstance(intent, PaymentOptions):
             return self._payment(intent, selected, original_display, pinned)
