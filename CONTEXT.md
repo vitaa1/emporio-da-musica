@@ -20,6 +20,10 @@ This document preserves project context for continuing development with Codex CL
 
 ## Current project status
 
+- The official extraction prompt is versioned in `providers/prompts/extraction.md`. With the added contextual-reference examples, Qwen 3B passed the three-turn smoke sequence; Gemma 4B selected the wrong product on the quote step. This is a limited development evaluation, not a general reliability claim. The model default remains unchanged.
+- P08 is being implemented on `feature/ollama-integration` using Windows-hosted Ollama and `qwen2.5:3b`. The local adapter, full manual context, natural-language CLI, offline transport tests, and opt-in evaluation exist. See `docs/OLLAMA_EVALUATION.md` for actual results and limitations. Publication and remote CI are pending.
+- The package refactor merged through PR #25 at `e0a0aa7`; main was synchronized before creating the P08 branch.
+
 - Setup issue #1 is complete. EditorConfig/Ruff issue #5 was merged through PR #6 at commit `74eb53c` and is closed.
 - Issue #3 (P02) covers contributor-workflow validation and documentation synchronization. It was merged through PR #13 at commit `0f7f59f`; issue #3 is closed.
 - P03 (issue #4) was merged through PR #15 at `6a45247`; all three PR checks passed.

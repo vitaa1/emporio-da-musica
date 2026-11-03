@@ -2,7 +2,7 @@
 
 ## Project Structure & Documentation
 
-The repository contains development tooling, an in-memory CSV loader, typed Pydantic contracts, an offline catalog controller/CLI, and deterministic tests. Live model integration remains planned.
+The repository contains development tooling, an in-memory CSV loader, typed Pydantic contracts, an offline catalog controller/CLI, and deterministic tests. Local Ollama extraction is available; live checks must remain opt-in.
 
 - `emporio_da_musica/`: CSV records, validation, indexes, and a count-only validation command.
 - `emporio_da_musica/contracts/`: intents, results, dates, and internal session contracts.

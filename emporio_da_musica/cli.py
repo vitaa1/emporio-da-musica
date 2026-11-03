@@ -1,6 +1,7 @@
 """Offline catalog CLI with an explicitly limited demonstration provider."""
 
 import argparse
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,6 +10,7 @@ from .contracts.common import MAX_MESSAGE_LENGTH
 from .controller import Controller
 from .data.loader import DataError, load_snapshot
 from .providers.demo import DemoProvider
+from .providers.ollama import OllamaProvider
 
 HELP = """Demonstração offline, sem modelo de linguagem.
 /buscar NOME — procurar produtos (ou /buscar para listar)
@@ -66,7 +68,12 @@ def demo_guidance(message, session):
 
 
 def run_cli(controller, source, destination):
-    destination.write(HELP)
+    help_text = (
+        HELP
+        if isinstance(controller.provider, DemoProvider)
+        else "Olá! Sou o assistente do Empório da Música. Conte o que você procura. Use /sair para encerrar e /cancelar para cancelar consultas pendentes.\n"
+    )
+    destination.write(help_text)
     try:
         while True:
             destination.write("> ")
@@ -83,7 +90,7 @@ def run_cli(controller, source, destination):
             if message == "/sair":
                 break
             if message == "/ajuda":
-                destination.write(HELP)
+                destination.write(help_text)
                 continue
             if isinstance(controller.provider, DemoProvider):
                 guidance = demo_guidance(message, controller.session)
@@ -101,7 +108,7 @@ def main():
     parser.add_argument(
         "--demo",
         action="store_true",
-        required=True,
+        default=False,
         help="Use the offline command-based fake provider",
     )
     parser.add_argument(
@@ -109,13 +116,33 @@ def main():
         type=Path,
         default=Path(__file__).resolve().parent.parent / "data/demo",
     )
+    parser.add_argument(
+        "--ollama-url", default=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    )
+    parser.add_argument("--model", default=os.getenv("OLLAMA_MODEL", "qwen2.5:3b"))
+    parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--manual", type=Path, help="Reviewed UTF-8 manual text")
     args = parser.parse_args()
     try:
         snapshot = load_snapshot(args.data_dir)
     except DataError as error:
         parser.exit(1, f"Data validation failed: {error}\n")
+    try:
+        manual = args.manual.read_text(encoding="utf-8") if args.manual else None
+        provider = (
+            DemoProvider()
+            if args.demo
+            else OllamaProvider(
+                base_url=args.ollama_url,
+                model=args.model,
+                timeout=args.timeout,
+                manual=manual,
+            )
+        )
+    except (ValueError, OSError):
+        parser.exit(1, "Invalid provider configuration or unreadable manual.\n")
     controller = Controller(
-        snapshot, DemoProvider(), clock=lambda: datetime.now(timezone.utc)
+        snapshot, provider, clock=lambda: datetime.now(timezone.utc)
     )
     run_cli(controller, sys.stdin, sys.stdout)
 
