@@ -37,8 +37,9 @@ Windows-hosted Ollama is reachable from WSL at the Windows host address (`ip rou
 - A minimal P12 slice (policy answers, out-of-scope, small talk, complaints) merged through PR #29 at `8702d8a`. Issue #20 stays open for the remaining P12 criteria.
 - GitHub issue mapping: P10 → #18, P11 → #19, P12 → #20, P13 → #21, P14 → #22 (all open). M0–M2 are complete.
 - P11 (#19), return assessment, merged through PR #30 at `6be1ded`.
-- Address fix on `fix/store-address-answer`: "Qual o endereço da loja?" (an assignment example) was sometimes answered as out of scope because the policy model returned covered=false; an uncovered or failed answer to an explicit, store-anchored address question now falls back to fixed §1.2 text and contact detection uses the isolated question (349 offline tests; two review rounds applied). Commit and PR are pending.
-- Next: P10 (#18), remaining P12, P13, P14. The recruitment deadline is still unknown.
+- Address fix merged through PR #31 at `0c7641b`: an uncovered or failed answer to a whole-question store-address request falls back to fixed §1.2 text; contact detection uses the isolated question.
+- P10 (#18), credit installments and local freight, is implemented on `feature/payment-freight` (388 offline tests; two review rounds applied; completed-quote facts carried and announced for the same product); commit and PR are pending.
+- Next: remaining P12 (separate accessory and general out-of-scope messages), P13, P14. Known pre-existing: a quote by product name also prints the search line. The recruitment deadline is still unknown.
 - Known pre-existing defects (also on main before P09, not yet fixed): quoting a displayed list item replaces the displayed list with only that product, so a following ordinal may fail; a quote without a product after `/cancelar` clears the selection.
 - A manual test guide was drafted in chat but not saved to the repository.
 

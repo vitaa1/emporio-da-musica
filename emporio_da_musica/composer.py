@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from .catalog import CATEGORY_IGNORED
+from .catalog import CATEGORY_IGNORED, INSTALLMENT_MINIMUM_NOT_MET
 from .contracts.results import (
     CatalogData,
     ComplaintData,
@@ -11,6 +11,7 @@ from .contracts.results import (
     PolicyData,
     ProductQuote,
     ReturnData,
+    ShippingData,
     SmallTalkData,
 )
 
@@ -33,6 +34,7 @@ FIELDS = {
     "payment_method": "a forma de pagamento",
     "installments": "o número de parcelas",
     "order_id": "o número do pedido",
+    "destination": "a cidade e o estado de entrega (por exemplo, Campo Grande/MS)",
     "reason": "o motivo: arrependimento de compra online, defeito de fabricação ou troca por preferência (cor, modelo, tamanho)",
     "purchase_channel": "se a compra foi feita online ou na loja física",
     "received_at": "a data em que você recebeu o produto (por exemplo, 01/11/2026, hoje ou ontem)",
@@ -41,6 +43,7 @@ FIELDS = {
 OPERATIONS = {
     "order_status": "a consulta do pedido",
     "payment_options": "a cotação",
+    "shipping_quote": "a cotação de frete",
     "return_assessment": "a avaliação de troca ou devolução",
 }
 TEMPLATES = {
@@ -62,7 +65,9 @@ REASONS = {
     "NO_CATALOG_MATCH": "Não encontrei produtos com esses critérios.",
     "COMBINED_PAYMENT_REQUIRES_CONFIRMATION": "Pagamento combinado precisa de confirmação da loja. Não solicitei essa confirmação.",
     "AMBIGUOUS_INSTALLMENT_BAND": "A regra para 2–3 parcelas precisa de confirmação da loja. Não solicitei essa confirmação.",
-    "INSTALLMENT_QUOTE_NOT_SUPPORTED": "O cálculo desse parcelamento ainda não está disponível.",
+    "FREE_FREIGHT_BOUNDARY": "O subtotal ficou em exatamente R$ 500,00, e o manual não define o frete nesse valor (grátis acima de R$ 500, R$ 35 abaixo). Isso precisa de confirmação da loja; não solicitei essa confirmação.",
+    "DELIVERY_REGION_UNCONFIRMED": "Nesta demonstração, só calculo o frete para entregas em Campo Grande/MS. O manual não lista as cidades da região metropolitana, e o frete para outras cidades depende do CEP, do peso e das dimensões do produto, sem integração com Correios ou Jadlog aqui. Pelo manual, os prazos estimados são PAC 5 a 12, SEDEX 2 a 5 e Jadlog 3 a 8 dias úteis, e instrumentos de grande porte podem exigir cotação especial (seção 5.2). A loja precisa confirmar o valor; não solicitei essa cotação.",
+    "PRODUCT_NOT_SHIPPABLE": "O produto não está disponível para a quantidade solicitada, então não calculei o frete.",
     "MULTIPLE_ACTIVE_PROMOTIONS": "Há promoções ativas conflitantes; o preço precisa de confirmação da loja.",
     "OPERATION_NOT_SUPPORTED": "Essa operação ainda não está disponível nesta demonstração.",
     "OPERATION_FAILED": "Não consegui concluir essa consulta. Tente novamente.",
@@ -113,6 +118,10 @@ PROVENANCE = {
 }
 RETURN_FOOTER = "Avaliação preliminar com base no manual e nas informações disponíveis; nenhuma devolução, troca ou reembolso foi solicitado, aprovado ou realizado. Para dar andamento, procure a equipe da loja."
 
+QUOTE_FACTS_REUSED = "Usei a quantidade, a forma de pagamento e o destino já informados na cotação anterior deste produto, quando não foram repetidos; informe outros dados se quiser mudar."
+CITY_ASSUMED = "City without state assumed to be Campo Grande/MS."
+SMALL_INSTALLMENTS_NOTE = "Parcelar em 2 ou 3 vezes precisa de confirmação da loja."
+
 BUDGET_IGNORED = "O limite de preço não foi reconhecido nesta mensagem e não foi aplicado; informe o valor em números (por exemplo, até R$ 1000)."
 CATALOG_FOOTER = "Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada."
 ORDER_FOOTER = "Dados do registro histórico do pedido, sem consulta em tempo real à transportadora; nenhuma alteração foi feita."
@@ -144,7 +153,51 @@ def render_quote(quote: ProductQuote) -> str:
         parts.append("Consulta de preço unitário: quantidade considerada igual a 1.")
     if quote.payment_method is None:
         parts.append("Sem desconto PIX enquanto o pagamento não for informado.")
+    parts.extend(render_installments(quote))
     return " ".join(parts)
+
+
+def render_installments(quote: ProductQuote) -> list[str]:
+    parts = []
+    if quote.installment_amount_brl is not None:
+        if quote.first_installment_brl is not None:
+            parts.append(
+                f"Parcelamento sem juros: 1ª parcela de {money(quote.first_installment_brl)} e {quote.installments - 1} de {money(quote.installment_amount_brl)}."
+            )
+        else:
+            parts.append(
+                f"Parcelamento sem juros: {quote.installments}x de {money(quote.installment_amount_brl)}."
+            )
+    if INSTALLMENT_MINIMUM_NOT_MET in quote.assumptions:
+        parts.append(
+            "O número de parcelas pedido não atende à parcela mínima do manual (R$ 80 de 4x a 6x; R$ 100 de 7x a 12x)."
+        )
+    if quote.payment_method == "credit" and quote.installments is None:
+        if quote.max_installments is not None:
+            parts.append(
+                f"No crédito, dá para parcelar em até {quote.max_installments}x sem juros respeitando a parcela mínima."
+            )
+        else:
+            parts.append(
+                "Esse valor não permite 4 parcelas ou mais com a parcela mínima do manual."
+            )
+    return parts
+
+
+def render_shipping(data: ShippingData, position: int) -> str:
+    freight = (
+        "frete grátis (pedido acima de R$ 500,00)"
+        if data.freight_brl == 0
+        else f"frete de {money(data.freight_brl)} (pedido abaixo de R$ 500,00)"
+    )
+    lines = [
+        f"{position}. {render_quote(data.quote)}",
+        f"Entrega em {safe_text(data.destination_city)}: {freight}. Subtotal dos produtos: {money(data.subtotal_brl)}; total com frete: {money(data.subtotal_brl + data.freight_brl)}.",
+        "Prazo estimado pelo manual: 1 a 3 dias úteis, por motoboy próprio. É uma estimativa, não uma data de entrega garantida. (Manual da loja, seção 5.1.)",
+    ]
+    if CITY_ASSUMED in data.assumptions:
+        lines.append("Considerei Campo Grande/MS, já que o estado não foi informado.")
+    return "\n".join(lines)
 
 
 def render_order(order: OrderData) -> str:
@@ -211,6 +264,10 @@ def compose(results, displayed_ids: tuple[int, ...], pending, notes=()) -> str:
                     )
                 completed.append("\n".join(lines))
                 footers.append(CATALOG_FOOTER)
+            elif isinstance(result.data, ShippingData):
+                position = displayed_ids.index(result.data.quote.product_id) + 1
+                completed.append(render_shipping(result.data, position))
+                footers.append(CATALOG_FOOTER)
             elif isinstance(result.data, ProductQuote):
                 position = displayed_ids.index(result.data.product_id) + 1
                 completed.append(f"{position}. {render_quote(result.data)}")
@@ -237,6 +294,23 @@ def compose(results, displayed_ids: tuple[int, ...], pending, notes=()) -> str:
                     result.reason_code, "Não foi possível concluir essa operação."
                 )
             )
+    quotes = [
+        q
+        for r in results
+        if r.status == "success"
+        for q in (
+            r.data.products
+            if isinstance(r.data, CatalogData)
+            else (r.data.quote,)
+            if isinstance(r.data, ShippingData)
+            else (r.data,)
+            if isinstance(r.data, ProductQuote)
+            else ()
+        )
+    ]
+    if any(q.payment_method == "credit" and q.installments is None for q in quotes):
+        # Stated once per response rather than on every listed product.
+        notes = (*notes, SMALL_INSTALLMENTS_NOTE)
     blocks = completed + limitations + list(notes)
     blocks.extend(dict.fromkeys(footers))
     if pending:

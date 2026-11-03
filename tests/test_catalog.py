@@ -155,11 +155,6 @@ def test_rounding_quantity_budget_and_no_implicit_availability_filter(snapshot):
             "requires_confirmation",
             "AMBIGUOUS_INSTALLMENT_BAND",
         ),
-        (
-            {"payment_method": "credit", "installments": 6},
-            "unavailable",
-            "INSTALLMENT_QUOTE_NOT_SUPPORTED",
-        ),
     ],
 )
 def test_unsupported_payment_is_not_silently_quoted(snapshot, fields, status, reason):
@@ -201,23 +196,103 @@ def test_demo_edge_cases():
         assert quote.promotion_percent == Decimal(percent)
 
 
-@pytest.mark.parametrize("installments", range(1, 13))
-def test_credit_installment_band_states(snapshot, installments):
+def priced(snapshot, price, stock=10):
+    product = replace(
+        snapshot.products[1], price_brl=Decimal(price), stock_quantity=stock
+    )
+    return replace(snapshot, products={1: product})
+
+
+@pytest.mark.parametrize("installments", [2, 3])
+def test_ambiguous_installment_band_requires_confirmation(snapshot, installments):
     result = search(
         snapshot, query="Modelo 1", payment_method="credit", installments=installments
     )
-    if installments == 1:
-        assert result.status == "success"
-        assert result.data.products[0].installments == 1
+    assert result.status == "requires_confirmation"
+    assert result.reason_code == "AMBIGUOUS_INSTALLMENT_BAND"
+    assert result.policy_references == ("3.1",)
+    assert result.data is None
+
+
+@pytest.mark.parametrize(
+    ("price", "count", "eligible"),
+    [
+        ("320.00", 4, True),  # exactly BRL 80 each
+        ("319.99", 4, False),
+        ("480.00", 6, True),
+        ("479.99", 6, False),
+        ("700.00", 7, True),  # exactly BRL 100 each
+        ("699.99", 7, False),
+        ("1200.00", 12, True),
+        ("1199.99", 12, False),
+    ],
+)
+def test_installment_minimum_boundaries(snapshot, price, count, eligible):
+    result = search(
+        priced(snapshot, price),
+        query="Modelo 1",
+        payment_method="credit",
+        installments=count,
+    )
+    quote = result.data.products[0]
+    assert result.policy_references == ("3", "3.1", "6")
+    assert quote.final_total_brl == Decimal(price)
+    if eligible:
+        assert quote.installments == count
+        assert quote.installment_amount_brl * count == Decimal(price)
+        assert quote.first_installment_brl is None
     else:
-        assert result.data is None
-        assert result.policy_references == ("3.1",)
-        if installments <= 3:
-            assert result.status == "requires_confirmation"
-            assert result.reason_code == "AMBIGUOUS_INSTALLMENT_BAND"
-        else:
-            assert result.status == "unavailable"
-            assert result.reason_code == "INSTALLMENT_QUOTE_NOT_SUPPORTED"
+        assert quote.installments is None
+        assert quote.installment_amount_brl is None
+        assert "Requested installments do not meet the minimum." in quote.assumptions
+
+
+def test_installment_rounding_puts_remainder_in_first(snapshot):
+    quote = search(
+        priced(snapshot, "1000.00"),
+        query="Modelo 1",
+        payment_method="credit",
+        installments=7,
+    ).data.products[0]
+    assert quote.installment_amount_brl == Decimal("142.85")
+    assert quote.first_installment_brl == Decimal("142.90")
+    assert quote.first_installment_brl + 6 * quote.installment_amount_brl == Decimal(
+        "1000.00"
+    )
+
+
+def test_installments_use_quantity_total_and_promotion_without_pix(snapshot):
+    snapshot = priced(snapshot, "100.00")
+    snapshot.promotions_by_product[1] = (Promotion(1, 1, Decimal("20"), "", True),)
+    quote = search(
+        snapshot,
+        query="Modelo 1",
+        quantity=5,
+        payment_method="credit",
+        installments=5,
+    ).data.products[0]
+    assert quote.final_total_brl == Decimal("400.00")
+    assert quote.installment_amount_brl == Decimal("80.00")
+
+
+@pytest.mark.parametrize(
+    ("price", "maximum"),
+    [("10.10", None), ("319.99", None), ("320.00", 4), ("699.99", 6), ("1200", 12)],
+)
+def test_credit_without_count_reports_maximum(snapshot, price, maximum):
+    quote = search(
+        priced(snapshot, price), query="Modelo 1", payment_method="credit"
+    ).data.products[0]
+    assert quote.max_installments == maximum
+    assert quote.installments is None
+
+
+def test_single_credit_installment_is_a_plain_quote(snapshot):
+    quote = search(
+        snapshot, query="Modelo 1", payment_method="credit", installments=1
+    ).data.products[0]
+    assert quote.installments == 1
+    assert quote.installment_amount_brl is None
 
 
 def test_default_bound_shows_all_bundled_yamaha_guitars():
@@ -248,3 +323,12 @@ def test_wrong_model_category_falls_back_to_name_search():
 
     # Another instrument never falls back to a category listing.
     assert search(bundled, query="violino", category="Violões").status == "not_found"
+
+
+def test_small_installment_note_appears_once_in_listing(snapshot):
+    from emporio_da_musica.composer import SMALL_INSTALLMENTS_NOTE, compose
+
+    result = search(snapshot, query="Modelo", payment_method="credit")
+    ids = tuple(q.product_id for q in result.data.products)
+    text = compose([result], ids, ())
+    assert text.count(SMALL_INSTALLMENTS_NOTE) == 1

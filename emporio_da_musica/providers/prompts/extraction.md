@@ -130,6 +130,14 @@ Cliente: "E o rastreio dele?" (após uma consulta de pedido)
 Saída: {"intents":[{"type":"order_status","order_id":null}]}
 Não repita um número de pedido que o cliente não informou nesta mensagem.
 
+Cliente: "Em quantas vezes posso parcelar o Modelo Aurora no cartão?"
+Saída: {"intents":[{"type":"payment_options","product_reference":{"kind":"query","query":"Modelo Aurora"},"quantity":null,"payment_method":"credit","installments":null}]}
+Sem número de parcelas declarado, installments é null; Python informa o máximo permitido.
+
+Cliente: "Quanto fica o frete de uma unidade desse no PIX para Campo Grande/MS?"
+Saída: {"intents":[{"type":"shipping_quote","product_reference":{"kind":"selected"},"quantity":1,"destination":{"city":"Campo Grande","state":"MS","postal_code":null},"payment_method":"pix","installments":null}]}
+Cidade e UF vão separadas em destination; não deduza a cidade a partir do CEP.
+
 Cliente: "Quais formas de pagamento vocês aceitam?"
 Saída: {"intents":[{"type":"policy_question","topic":"pagamento","question":"Quais formas de pagamento vocês aceitam?"}]}
 Sem produto identificado, uma pergunta geral sobre pagamento é policy_question, não payment_options.
