@@ -126,7 +126,7 @@ SMALL_INSTALLMENTS_NOTE = "Parcelar em 2 ou 3 vezes precisa de confirmação da 
 BUDGET_IGNORED = "O limite de preço não foi reconhecido nesta mensagem e não foi aplicado; informe o valor em números (por exemplo, até R$ 1000)."
 CARD_QUESTION = "Quantas unidades você quer e como prefere pagar?"
 LIST_QUESTION = "Qual modelo te interessa?"
-CATALOG_FOOTER = "Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada."
+CATALOG_FOOTER = "Nada foi comprado ou reservado; valores do catálogo da loja."
 ORDER_FOOTER = "Dados do registro histórico do pedido, sem consulta em tempo real à transportadora; nenhuma alteração foi feita."
 
 

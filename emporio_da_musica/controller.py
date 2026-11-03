@@ -91,6 +91,8 @@ INSTRUMENT_CATEGORIES = {
     "pianos": "Pianos",
     "bateria": "Baterias",
     "baterias": "Baterias",
+    "baixo": "Baixos",
+    "baixos": "Baixos",
 }
 MIN_RECOVERED_TERM_LENGTH = 4
 PURCHASE_WORDS = re.compile(
@@ -157,12 +159,7 @@ def _rerouted_search(snapshot, intent, message, guided_category, intent_count):
         )
     if isinstance(intent, OutOfScope) and intent_count == 1:
         # "mostre as guitarras" sent out of scope; accessories remain out of scope.
-        named = {
-            INSTRUMENT_CATEGORIES[word]
-            for word in _words(message)
-            if word in INSTRUMENT_CATEGORIES
-            and _category_products(snapshot, INSTRUMENT_CATEGORIES[word])
-        }
+        named = _named_categories(snapshot, message)
         wanted = LIST_WORDS.search(text) or PURCHASE_WORDS.search(text)
         if len(named) == 1 and wanted and not ACCESSORY_WORDS.search(text):
             return ProductSearch(type="product_search", category=named.pop())
@@ -180,6 +177,8 @@ def _catalog_guide(snapshot, intent):
     }
     for generic in GENERIC_NAME_WORDS:
         brand_words.pop(generic, None)
+    if "music" in brand_words:
+        brand_words["music"] = "Music Man"  # The only two-word brand in the catalog.
     brands = []
     for product in sorted(products, key=lambda p: p.product_id):
         for word in _words(product.name):
@@ -197,6 +196,22 @@ def _catalog_guide(snapshot, intent):
         lowest_price_brl=min(sellable, default=None),
         highest_price_brl=max(sellable, default=None),
     )
+
+
+LOW_PRICE_PHRASE = re.compile(r"\b(mais|preco|valor|custo|bem|muito|por)\s+baixo\b")
+
+
+def _named_categories(snapshot, message):
+    """Categories of instruments typed; "preço baixo" does not name a bass."""
+    words = set(_words(message))
+    if LOW_PRICE_PHRASE.search(normalize(message)):
+        words.discard("baixo")
+    return {
+        INSTRUMENT_CATEGORIES[word]
+        for word in words
+        if word in INSTRUMENT_CATEGORIES
+        and _category_products(snapshot, INSTRUMENT_CATEGORIES[word])
+    }
 
 
 def _words(text):
@@ -221,12 +236,7 @@ def _checked_search_terms(snapshot, intent, message):
     """
     typed = _words(message)
     query, category = intent.query, intent.category
-    named = {
-        INSTRUMENT_CATEGORIES[word]
-        for word in typed
-        if word in INSTRUMENT_CATEGORIES
-        and _category_products(snapshot, INSTRUMENT_CATEGORIES[word])
-    }
+    named = _named_categories(snapshot, message)
     inferred = next(iter(named)) if len(named) == 1 else None
     if query and _typed_amounts(query) == {intent.max_price_brl}:
         # The budget copied into the name would match models such as "FG800".

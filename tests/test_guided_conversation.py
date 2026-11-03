@@ -178,3 +178,20 @@ def test_copied_budget_is_dropped_silently_when_no_budget_was_mentioned(demo):
         demo, search("C70", max_price_brl="1000"), message="quanto custa o C70?"
     )
     assert "limite de preço" not in response.text
+
+
+def test_bass_is_an_instrument_but_a_low_price_is_not(demo):
+    response = turn(demo, search("baixo"), message="quero um baixo")
+    assert response.results[0].status == "success"
+    assert response.results[0].data.total_matches == 4
+    response = turn(
+        demo, search(None, "Violões"), message="mostre violões de preço mais baixo"
+    )
+    assert response.results[0].data.total_matches == 35
+    response = turn(demo, search(), message="mostre o preço mais baixo")
+    assert response.results[0].data.total_matches == 65
+
+
+def test_two_word_brand_is_shown_in_full(demo):
+    response = turn(demo, search("baixo"), message="quero um baixo")
+    assert "Music Man" in response.text

@@ -135,7 +135,7 @@ def test_order_and_catalog_in_one_turn_keep_separate_footers(snapshot):
     app = controller(snapshot)
     response = turn(app, search("Piano"), lookup(1), message="pedido 1")
     assert [r.status for r in response.results] == ["success", "success"]
-    assert "nenhuma compra ou reserva" in response.text
+    assert "Nada foi comprado ou reservado" in response.text
     assert "sem consulta em tempo real à transportadora" in response.text
 
 
