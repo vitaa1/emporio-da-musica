@@ -13,7 +13,7 @@ The repository contains development tooling, an in-memory CSV loader, typed Pyda
 - `pyproject.toml`: Python `>=3.13,<3.14`, metadata, and direct dependencies.
 - `requirements.txt` and `requirements-dev.txt`: generated runtime and development pins.
 - `.github/workflows/ci.yml`: cross-platform setup checks.
-- `README.md`: setup; `CONTEXT.md`: historical context and current handoff. Verify snapshots against actual files.
+- `README.md`: submission overview; `docs/DEVELOPMENT.md`: contributor setup; `docs/BEHAVIOR.md`: feature conventions; `CONTEXT.md`: historical context and current handoff. Verify snapshots against actual files.
 
 Before implementing, read [architecture](docs/ARCHITECTURE.md) and [contracts](docs/CONTRACT.md). Consult [milestones and issues](docs/GITHUB_PLAN.md) for scope and dependencies. Distinguish approved directions from proposed defaults and unresolved policies. Update documentation when behavior changes; do not duplicate detailed contracts here.
 
@@ -39,7 +39,7 @@ python3.13 -m venv .venv
 .venv/bin/python -m pytest -q
 ```
 
-Create `.venv` only when absent. Follow README instructions for pip-tools generation in the Linux/WSL reference environment. Never edit generated pins manually; keep them with declaration changes. Regenerate both runtime and development dependency outputs when declarations change.
+Create `.venv` only when absent. Follow `docs/DEVELOPMENT.md` for pip-tools generation in the Linux/WSL reference environment. Never edit generated pins manually; keep them with declaration changes. Regenerate both runtime and development dependency outputs when declarations change.
 
 ## Style & Validation
 
