@@ -229,3 +229,22 @@ def test_default_bound_shows_all_bundled_yamaha_guitars():
     result = search(bundled, query="Yamaha", category="Violões")
     assert result.data.total_matches == 7
     assert len(result.data.products) == 7
+
+
+def test_wrong_model_category_falls_back_to_name_search():
+    from pathlib import Path
+
+    from emporio_da_musica.data.loader import load_snapshot
+
+    bundled = load_snapshot(Path(__file__).resolve().parents[1] / "data/demo")
+    result = search(bundled, query="Takamine GD20", category="Guitarras")
+    assert result.status == "success"
+    assert result.data.products[0].name == "Takamine GD20 Dreadnought Natural"
+    assert "one was ignored" in result.data.products[0].assumptions[-1]
+    assert search(bundled, query="Inexistente", category="Guitarras").status == (
+        "not_found"
+    )
+    assert search(bundled, category="Sopros").status == "not_found"
+
+    # Another instrument never falls back to a category listing.
+    assert search(bundled, query="violino", category="Violões").status == "not_found"

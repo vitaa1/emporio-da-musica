@@ -391,3 +391,45 @@ def test_new_installments_are_not_replaced_by_inherited_method(app):
     response = turn(app, payment(installments=1, quantity=1))
     assert response.results[-1].status != "success"
     assert "PIX" not in response.text
+
+
+def test_budget_not_typed_in_current_message_is_ignored(app):
+    budget = {"type": "product_search", "query": "Piano", "max_price_brl": "100"}
+    response = turn(app, budget, message="Quanto custa o piano?")
+    assert response.results[0].status == "success"
+    response = turn(app, budget, message="piano até R$ 100,00")
+    assert response.results[0].status == "not_found"
+    response = turn(app, {**budget, "max_price_brl": "5000"}, message="até R$5.000")
+    assert response.results[0].status == "success"
+
+
+@pytest.mark.parametrize(
+    "message,budget",
+    [
+        ("piano até R$ 5.000,00", "5000"),
+        ("piano até 5000.00", "5000"),
+        ("piano até 5 mil", "5000"),
+        ("piano até mil e quinhentos", "1000"),
+        ("piano até 4.999,90", "4999.90"),
+    ],
+)
+def test_typed_budget_formats_are_kept(app, message, budget):
+    intent = {"type": "product_search", "query": "Piano", "max_price_brl": budget}
+    response = turn(app, intent, message=message)
+    assert "limite de preço não foi reconhecido" not in response.text
+
+
+def test_dropped_budget_is_announced(app):
+    intent = {"type": "product_search", "query": "Piano", "max_price_brl": "100"}
+    response = turn(app, intent, message="quanto custa o piano?")
+    assert response.results[0].status == "success"
+    assert "limite de preço não foi reconhecido" in response.text
+
+
+def test_model_invented_query_is_dropped_but_typed_query_kept(app):
+    intent = {"type": "product_search", "query": "viola", "category": "Instrumentos"}
+    response = turn(app, intent, message="quais instrumentos vocês têm?")
+    assert response.results[0].data.total_matches == 3
+    intent = {"type": "product_search", "query": "violino", "category": "Instrumentos"}
+    response = turn(app, intent, message="tem violino?")
+    assert response.results[0].status == "not_found"

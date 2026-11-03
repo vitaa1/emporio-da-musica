@@ -7,6 +7,15 @@ class FakeProvider:
     def __init__(self):
         self.responses = []
         self.requests = []
+        self.policy_responses = []
+        self.policy_requests = []
+
+    def explain(self, request):
+        self.policy_requests.append(request)
+        response = self.policy_responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response if isinstance(response, str) else json.dumps(response)
 
     def propose(self, request):
         self.requests.append(request)

@@ -30,5 +30,17 @@ class IntentProvider(Protocol):
         ...
 
 
+class PolicyRequest(Contract):
+    """Only the general question; no history, identity, or session state."""
+
+    question: Text
+
+
+class PolicyProvider(Protocol):
+    def explain(self, request: PolicyRequest) -> str:
+        """Return raw JSON matching PolicyData; validated by the caller."""
+        ...
+
+
 class ProviderError(RuntimeError):
     """Provider adapters translate connection/timeout failures to this exception."""
