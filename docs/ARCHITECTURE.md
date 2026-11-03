@@ -33,6 +33,8 @@ Use one agent, CSVs loaded into memory, Pydantic contracts, session-only history
 
 Expose a closed set of operations to the controller. The model must not generate executable code, arbitrary SQL, or arbitrary function names. Multiple intents execute sequentially; dependencies must be resolved before dependent execution. A missing product selection blocks its payment calculation, not an independent hours question.
 
+For warranty-only general explanations, Python now renders a reviewed summary of manual §§8.1–8.3 after validation: the model selects the topic/sections but does not rewrite the warranty facts. Other general explanations retain the validated prose route, with its documented semantic limitations.
+
 There is no free-form synthesis after each query. Python composes prices, discounts, stock, order information, failures, and clarification questions. A separate LLM call for general policy explanations is a proposed implementation detail, invoked only for that route. It must not decide individual eligibility or make commercial commitments.
 
 ## Data and source audit

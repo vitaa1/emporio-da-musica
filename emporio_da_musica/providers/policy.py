@@ -14,6 +14,21 @@ from ..contracts.common import PolicyReference
 from ..contracts.results import PolicyData
 from .base import PolicyProvider, PolicyRequest
 
+# General warranty explanations use reviewed text: a schema-valid model response
+# mixed the warranty rule with LGPD. The model selects sections, not these facts.
+WARRANTY_SECTIONS = {"8", "8.1", "8.2", "8.3"}
+WARRANTY_ANSWER = PolicyData(
+    answer=(
+        "Segundo o manual da loja, a garantia legal é de 90 dias contra defeitos "
+        "de fabricação, contados do recebimento. A garantia adicional do fabricante "
+        "varia; consulte o prazo e as condições no certificado do instrumento. "
+        "O manual exclui desgaste natural, mau uso, quedas, condições climáticas "
+        "extremas, modificações ou reparos não autorizados e danos estéticos que "
+        "não afetem o funcionamento. Isso não confirma cobertura de um caso individual."
+    ),
+    policy_references=("8.1", "8.2", "8.3"),
+)
+
 MAX_POLICY_ANSWER = 1000
 DEFAULT_MANUAL = Path(__file__).with_name("store_manual.txt")
 
@@ -90,4 +105,6 @@ def explain_policy(provider: PolicyProvider, question: str) -> PolicyData:
     if not _numbers(text) <= _numbers(manual):
         # Every number must exist in the manual: no invented prices or discounts.
         raise PolicyAnswerError("Policy answer contains unsupported numbers")
+    if set(data.policy_references) <= WARRANTY_SECTIONS:
+        return WARRANTY_ANSWER
     return data

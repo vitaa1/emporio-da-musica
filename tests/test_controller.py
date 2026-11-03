@@ -853,3 +853,160 @@ def test_pending_facts_reuse_is_announced(app):
         message="quanto fica?",
     )
     assert "cotação anterior" in response.text
+
+
+def test_payment_change_preserves_quantity_instead_of_model_default(app):
+    turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Piano"},
+            quantity=2,
+            payment_method="pix",
+        ),
+        message="Duas unidades do Piano no pix",
+    )
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "selected"},
+            quantity=1,
+            payment_method="credit",
+            installments=10,
+        ),
+        message="E em 10 vezes no crédito?",
+    )
+    quote = response.results[-1].data
+    assert quote.quantity == 2
+    assert quote.installments == 10
+    assert quote.final_total_brl == Decimal("6000")
+    assert "cotação anterior" in response.text
+
+
+def test_negated_pix_does_not_accept_model_copied_credit(app):
+    turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Piano"},
+            quantity=1,
+            payment_method="credit",
+        ),
+        message="Uma unidade do Piano no crédito",
+    )
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "selected"}, quantity=1, payment_method="credit"
+        ),
+        message="Não quero pix, quanto fica?",
+    )
+    assert response.results[-1].missing_fields == ("payment_method",)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "E em 10 vezes?",
+        "Quanto fica em 10x?",
+        "Quero pagar no crédito em 10 parcelas",
+        "E no crédito?",
+    ],
+)
+def test_payment_only_follow_up_keeps_quantity(app, message):
+    turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Piano"},
+            quantity=2,
+            payment_method="boleto",
+        ),
+    )
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "selected"}, quantity=1, payment_method="credit"
+        ),
+        message=message,
+    )
+    assert response.results[-1].data.quantity == 2
+
+
+@pytest.mark.parametrize(
+    "message", ["Uma unidade no crédito", "Quero 1 no crédito", "Uma no crédito"]
+)
+def test_explicit_quantity_change_is_not_overwritten_by_previous_quote(app, message):
+    turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Piano"},
+            quantity=2,
+            payment_method="boleto",
+        ),
+    )
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "selected"}, quantity=1, payment_method="credit"
+        ),
+        message=message,
+    )
+    assert response.results[-1].data.quantity == 1
+
+
+@pytest.mark.parametrize("method", ["credit", "debit", "boleto"])
+def test_non_pix_method_copied_to_new_product_is_discarded(app, method):
+    quote_piano_pix(app)
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Violão A"},
+            quantity=1,
+            payment_method=method,
+        ),
+        message="Uma unidade do Violão A",
+    )
+    assert response.results[-1].missing_fields == ("payment_method",)
+
+
+def test_payment_only_follow_up_cannot_revive_quantity_after_cancel(app):
+    quote_piano_pix(app)
+    app.handle("/cancelar")
+    response = turn(
+        app,
+        payment(product_reference={"kind": "selected"}, payment_method="credit"),
+        message="E no crédito?",
+    )
+    assert response.results[-1].missing_fields == ("quantity",)
+
+
+@pytest.mark.parametrize(
+    ("method", "message"),
+    [
+        ("credit", "Sem crédito, quanto fica?"),
+        ("debit", "Sem débito"),
+        ("boleto", "Sem boleto"),
+    ],
+)
+def test_explicitly_excluded_method_needs_clarification(app, method, message):
+    quote_piano_pix(app)
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "selected"}, quantity=1, payment_method=method
+        ),
+        message=message,
+    )
+    assert response.results[-1].missing_fields == ("payment_method",)
+
+
+def test_interest_free_credit_is_not_treated_as_negated_payment(app):
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Piano"},
+            quantity=1,
+            payment_method="credit",
+            installments=10,
+        ),
+        message="Uma unidade do Piano em 10x no crédito sem juros",
+    )
+    assert response.results[-1].data.installments == 10

@@ -115,3 +115,19 @@ These single development runs are not accuracy estimates. Python guards prevente
 On 2026-11-03, `qwen2.5:3b` was compared with and without a new-product example on four sequences, three runs each. Without it, "adicione uma unidade do Crafter HT-100…" after a C40 PIX quote also requoted the C40 in all three runs; with it, only the Crafter was quoted, but the model copied `pix` in all three runs, even after a prompt rule against it. Prompt guidance therefore did not suffice, and Python now requires evidence for PIX, the only method that changes a price.
 
 A final single run of three sequences gave the expected results for the Crafter follow-up (asks payment, then boleto), "E se forem 2 unidades?" (PIX reused with a notice), and ordinal quotes. Two gaps remain: "e em 10 vezes no crédito?" reported a maximum of 6x instead of the requested count, consistent with quantity 1 though the raw output was not captured, and "não quero pix, quanto fica?" gave no PIX discount but stayed on credit without asking. These are small development samples, not accuracy estimates.
+
+## Consolidated evaluation and review (P13)
+
+The [complete-agent evaluation](AGENT_EVALUATION.md) preserves the initial
+2026-11-03 findings (27/29 automated passes and an additional warranty grounding
+failure), the corrections, and subsequent verification. The latest run passed
+29/29 automated checks and all seven marked manual reviews. One earlier reviewed
+run had a sanitized provider error; its underlying cause remains unverified.
+
+The controller now retains quantity on recognized payment-only follow-ups and
+requires evidence for non-PIX methods too. Warranty-only policy answers use a
+fixed reviewed summary after validation. The evaluator matches overlapping
+expectations independently of response order. All 489 offline tests and Ruff
+checks passed. No prompts, dependencies, or infrastructure changed. These small
+development-informed runs are not a general accuracy estimate; the report records
+remaining limitations and links five real conversation transcripts.

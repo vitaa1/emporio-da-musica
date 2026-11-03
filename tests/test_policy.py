@@ -468,3 +468,47 @@ def test_message_without_topic_is_used_only_for_single_request(app):
     assert response.results[0].data.template == "scope_redirect"
     response = turn(app, {"type": "out_of_scope"}, message="Vocês vendem palhetas?")
     assert response.results[0].data.template == "accessory_redirect"
+
+
+def test_warranty_answer_does_not_mix_privacy_law_with_warranty(app):
+    app.provider.policy_responses.append(
+        {
+            "covered": True,
+            "answer": "A garantia dos instrumentos é de 90 dias contra defeitos de fabricação, conforme a Lei Geral de Proteção de Dados (LGPD).",
+            "policy_references": ["8.1"],
+        }
+    )
+    response = turn(app, policy(), message="Como funciona a garantia dos instrumentos?")
+    assert "LGPD" not in response.text
+    assert "90 dias" in response.text
+    assert "recebimento" in response.text
+    assert "certificado" in response.text
+
+
+def test_warranty_summary_does_not_replace_mixed_policy_answer(app):
+    app.provider.policy_responses.append(
+        {
+            "covered": True,
+            "answer": "A garantia legal é de 90 dias. Aos sábados atendemos das 9h às 13h.",
+            "policy_references": ["8.1", "2"],
+        }
+    )
+    response = turn(app, policy(), message="Qual é a garantia e o horário de sábado?")
+    assert "9h às 13h" in response.text
+    assert response.results[0].policy_references == ("8.1", "2")
+
+
+def test_warranty_summary_does_not_promise_manufacturer_specific_duration(app):
+    app.provider.policy_responses.append(
+        {
+            "covered": True,
+            "answer": "Esse fabricante oferece 2 anos de garantia.",
+            "policy_references": ["8.2"],
+        }
+    )
+    response = turn(
+        app, policy(), message="Qual é a garantia do fabricante do Yamaha C40?"
+    )
+    assert "2 anos" not in response.text
+    assert "certificado" in response.text
+    assert response.results[0].policy_references == ("8.1", "8.2", "8.3")
