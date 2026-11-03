@@ -196,14 +196,16 @@ The latest recorded run passed 29 of 29 turns across 12 scenarios. The cases wer
 
 ## Use of coding assistants
 
-Coding assistants were used throughout this project, and this disclosure covers how:
+I used two assistants, and they wrote most of the code and documentation:
 
-- **Codex CLI** was used from the start for requirements and source analysis, planning, architecture and contract drafts, implementation, and tests.
-- **Claude Code** was used from 2026-11-03 to continue implementation, live testing, evaluation, review, and documentation, including this README.
+- **Codex CLI** did most of the development: requirements and source analysis, planning, architecture and contract drafts, implementation, and tests.
+- **Claude Code** was used mainly for reviews and for adjusting the last implementations, and it also drafted this README.
 
-**Workflow.** I set the architecture direction, including Python-owned business rules, few-shot prompting, explicit guardrails, and problem decomposition, and I chose the scope. The assistants worked on one issue and branch at a time: plan from `docs/`, implement with offline tests, run the real model, review, fix confirmed findings, then update the documentation. Commits, pushes, and merges were made only with my authorization, and I merged each pull request after CI passed. The reviewer roles and skills used are versioned in `.codex/agents/` and `.agents/skills/`, and `AGENTS.md` holds the working rules.
+**My part.** The architecture and the scope are my decisions: the CLI → model → Python controller flow, Python-owned business rules, few-shot prompting, explicit guardrails, and problem decomposition. I reviewed and manually tested the work throughout, and I merged every pull request. I did not read every diff line by line, so I also relied on automated tests, CI, and review passes to check the code.
 
-Failures from live runs are preserved in [the Ollama evaluation](docs/OLLAMA_EVALUATION.md) and [the agent evaluation](docs/AGENT_EVALUATION.md).
+**Workflow.** The assistants worked on one issue and branch at a time: plan from `docs/`, implement with offline tests, run the real model, review, fix confirmed findings, then update the documentation. The reviewer roles and skills used are versioned in `.codex/agents/` and `.agents/skills/`, and `AGENTS.md` holds the working rules.
+
+Running the real model changed the design. The small model often returned valid JSON with the wrong meaning, such as order numbers copied from history, so those cases became checks in Python. The failures are preserved in [the Ollama evaluation](docs/OLLAMA_EVALUATION.md) and [the agent evaluation](docs/AGENT_EVALUATION.md).
 
 ## Further documentation
 
