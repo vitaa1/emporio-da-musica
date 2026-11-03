@@ -251,3 +251,142 @@ def test_store_name_and_manual_numbers_are_allowed(app):
     )
     response = turn(app, policy("troca?"))
     assert response.results[0].status == "success"
+
+
+UNCOVERED = {"covered": False, "answer": "", "policy_references": []}
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Qual o endereço da loja?",
+        "Qual o endereço?",
+        "Onde fica a loja?",
+        "Onde vocês ficam?",
+        "Vocês estão onde?",
+        "Como faço pra chegar aí?",
+        "Qual a rua da loja?",
+    ],
+)
+@pytest.mark.parametrize("failure", [UNCOVERED, ProviderError("synthetic"), "not json"])
+def test_uncovered_address_question_falls_back_to_manual(app, message, failure):
+    app.provider.policy_responses.append(failure)
+    response = turn(app, policy(message), message=message)
+    result = response.results[0]
+    assert result.status == "success"
+    assert result.policy_references == ("1.2",)
+    assert "Rua 14 de Maio, 3200" in response.text
+    assert "seção 1.2" in response.text
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Posso trocar o endereço de entrega?",
+        "Onde fica o rastreio do pedido?",
+        "Onde ficam as regras de devolução?",
+        "Qual a localização do meu pedido?",
+        "Como chego a pagar em 12x?",
+        "Qual o prazo de troca e o endereço para devolver?",
+    ],
+)
+def test_other_questions_are_not_address_requests(app, message):
+    app.provider.policy_responses.append(UNCOVERED)
+    response = turn(app, policy(message), message=message)
+    assert "Rua 14 de Maio" not in response.text
+
+
+def test_covered_answer_is_not_replaced_by_address(app):
+    message = "Qual o endereço e o horário de sábado?"
+    app.provider.policy_responses.extend([UNCOVERED, HOURS])
+    response = turn(
+        app,
+        policy("Qual o endereço"),
+        policy("o horário de sábado"),
+        message=message,
+    )
+    assert len(app.provider.policy_requests) == 2
+    assert response.text.count("Rua 14 de Maio") == 1
+    assert "seção 2" in response.text
+
+
+def test_contact_word_elsewhere_does_not_hide_policy_question(app):
+    message = "Posso trocar por e-mail? Qual o prazo de troca por defeito?"
+    app.provider.policy_responses.append(
+        {
+            "covered": True,
+            "answer": "Trocas por defeito valem por 30 dias após a compra.",
+            "policy_references": ["4.2"],
+        }
+    )
+    response = turn(
+        app,
+        policy("Posso trocar por e-mail?"),
+        policy("Qual o prazo de troca por defeito?"),
+        message=message,
+    )
+    statuses = [r.status for r in response.results]
+    assert statuses == ["requires_confirmation", "success"]
+    assert response.text.count("divergentes") == 1
+    assert "30 dias" in response.text
+
+
+def test_contact_request_without_isolated_question_uses_message(app):
+    response = turn(app, policy(), message="Qual o WhatsApp de vocês?")
+    assert response.results[0].reason_code == "CONTACT_CONFLICT"
+    assert app.provider.policy_requests == []
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Qual o endereço da loja e o horário de sábado?",
+        "Posso mudar o endereço de vocês no pedido?",
+        "Vocês abrem sábado? E onde fica a loja?",
+    ],
+)
+@pytest.mark.parametrize("failure", [UNCOVERED, ProviderError("synthetic")])
+def test_mixed_question_never_becomes_only_the_address(app, message, failure):
+    app.provider.policy_responses.append(failure)
+    response = turn(app, policy(), message=message)
+    assert "Rua 14 de Maio" not in response.text
+
+
+def test_non_literal_question_does_not_take_the_address(app):
+    message = "Qual o endereço da loja e o horário de funcionamento?"
+    app.provider.policy_responses.extend([UNCOVERED, UNCOVERED])
+    response = turn(
+        app,
+        policy("Quais são os horários?"),
+        policy("Qual o endereço da loja?"),
+        message=message,
+    )
+    assert response.text.count("Rua 14 de Maio") == 1
+    assert response.results[0].operation == "out_of_scope"
+
+
+def test_contact_request_not_isolated_still_gets_notice(app):
+    app.provider.policy_responses.append(HOURS)
+    response = turn(
+        app, policy("Qual o horário?"), message="Qual o horário? E o telefone?"
+    )
+    assert [r.status for r in response.results] == [
+        "success",
+        "requires_confirmation",
+    ]
+    assert "divergentes" in response.text
+
+
+def test_address_is_not_repeated_next_to_contact_notice(app):
+    message = "Qual o telefone, qual o endereço da loja e qual o horário?"
+    app.provider.policy_responses.extend([UNCOVERED, HOURS])
+    response = turn(
+        app,
+        policy("qual o telefone"),
+        policy("qual o endereço da loja"),
+        policy("qual o horário"),
+        message=message,
+    )
+    assert response.text.count("Rua 14 de Maio") == 1
+    assert "divergentes" in response.text
+    assert "seção 2" in response.text

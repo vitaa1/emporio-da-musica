@@ -35,6 +35,7 @@ from .contracts.results import (
     OutOfScopeData,
     OutOfScopeResult,
     PaymentOptionsResult,
+    PolicyData,
     PolicyQuestionResult,
     ReturnAssessmentResult,
     SmallTalkData,
@@ -77,6 +78,28 @@ def _state(state, **changes):
     fields = {key: getattr(state, key) for key in type(state).model_fields}
     return SessionState(**(fields | changes))
 
+
+# The address is a fixed fact (manual §1.2). The small policy model sometimes
+# reports it as uncovered, so an uncovered or failed answer falls back to this
+# text, but only when the whole question is a store-address request: mixed
+# questions, delivery addresses, and order locations keep their normal outcome.
+_ADDRESS_PHRASES = (
+    r"(?:qual (?:e )?)?o endereco(?: da loja| de voces| de vcs)?",
+    r"(?:qual (?:e )?a )?(?:rua|localizacao|cep) da loja",
+    r"onde (?:fica|e|esta) a loja(?: de voces)?",
+    r"onde voces (?:ficam|estao)",
+    r"voces (?:ficam|estao) onde",
+    r"como (?:chego|chegar|faco (?:pra|para) chegar) "
+    r"(?:ai|na loja|a loja|ate a loja|ate voces)",
+)
+ADDRESS_ONLY = re.compile(
+    r"^\W*(?:(?:oi|ola|bom dia|boa tarde|boa noite)\W+)?(?:"
+    + "|".join(_ADDRESS_PHRASES)
+    + r")(?:\W+(?:por favor|pf))?\W*$"
+)
+STORE_ADDRESS = (
+    "A loja fica na Rua 14 de Maio, 3200 — Centro, Campo Grande - MS, 79202-333."
+)
 
 RECEIPT_WORDS = re.compile(r"\b(hoje|ontem|anteontem)\b")
 MONTHS = (
@@ -343,6 +366,7 @@ class Controller:
             selected_order_id=selected_order,
             pending=tuple(pending),
         )
+        results = self._contact_notice(results, intents)
         text = compose(results, displayed, pending, notes=tuple(dict.fromkeys(notes)))
         return self._finish(message, text, tuple(results))
 
@@ -495,21 +519,62 @@ class Controller:
             self._message
         ):
             question = intent.question
-        if CONTACT_REQUEST.search(normalize(self._message)):
+        if CONTACT_REQUEST.search(normalize(question)):
             # The manual lists conflicting contacts; answer deterministically.
+            # Only the isolated question counts, so a contact word elsewhere in
+            # the message does not hide another policy question. Model answers
+            # are still filtered for contacts in providers/policy.py.
             return _result(intent.type, "requires_confirmation", "CONTACT_CONFLICT")
         try:
             data = explain_policy(self.provider, question)
         except NotCovered:
+            if ADDRESS_ONLY.match(normalize(question)):
+                return self._store_address()
             # Uncovered or unrelated questions get the fixed scope template.
             return OutOfScopeResult(status="success", data=OutOfScopeData())
         except ContactConflict:
             return _result(intent.type, "requires_confirmation", "CONTACT_CONFLICT")
         except (PolicyAnswerError, ProviderError) as error:
             LOGGER.warning("Policy answer failed: %s", type(error).__name__)
+            if ADDRESS_ONLY.match(normalize(question)):
+                return self._store_address()
             return _result(intent.type, "error", "POLICY_ANSWER_FAILED")
         return PolicyQuestionResult(
             status="success", data=data, policy_references=data.policy_references
+        )
+
+    def _contact_notice(self, results, intents):
+        """Keep a contact request visible and avoid repeating the address.
+
+        The conflict notice already includes the address, so a fixed address
+        fallback is dropped next to it. If the message asks for a contact but the
+        model isolated only another question, the notice is added once.
+        """
+        conflict = any(r.reason_code == "CONTACT_CONFLICT" for r in results)
+        if (
+            not conflict
+            and any(isinstance(i, PolicyQuestion) for i in intents)
+            and CONTACT_REQUEST.search(normalize(self._message))
+        ):
+            results.append(
+                _result("policy_question", "requires_confirmation", "CONTACT_CONFLICT")
+            )
+            conflict = True
+        if conflict:
+            results = [
+                r
+                for r in results
+                if not (
+                    isinstance(r.data, PolicyData) and r.data.answer == STORE_ADDRESS
+                )
+            ]
+        return results
+
+    @staticmethod
+    def _store_address():
+        data = PolicyData(answer=STORE_ADDRESS, policy_references=("1.2",))
+        return PolicyQuestionResult(
+            status="success", data=data, policy_references=("1.2",)
         )
 
     def _return(self, intent):
