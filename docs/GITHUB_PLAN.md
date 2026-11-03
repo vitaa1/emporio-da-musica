@@ -182,11 +182,13 @@ Milestone: M3. Suggested labels: `feature`, `domain`. Dependencies: P03, P07, P0
 **Scope:** Implement supported withdrawal, defect, and preference assessments, preserving distinct policy processes and source references.
 
 **Acceptance criteria**
-- [ ] Required facts vary with the request; general questions do not demand an order unnecessarily.
-- [ ] Actual receipt, purchase channel, condition, and exclusions remain unknown until supplied or verified.
-- [ ] Date-boundary tests use an injected clock; estimates cannot substitute for receipt.
-- [ ] Customer declarations are labeled as such and do not authorize a transaction.
-- [ ] Ambiguous conditions request confirmation; no refund/cancellation action is claimed.
+- [x] Required facts vary with the request; general questions do not demand an order unnecessarily.
+- [x] Actual receipt, purchase channel, condition, and exclusions remain unknown until supplied or verified.
+- [x] Date-boundary tests use an injected clock; estimates cannot substitute for receipt.
+- [x] Customer declarations are labeled as such and do not authorize a transaction.
+- [x] Ambiguous conditions request confirmation; no refund/cancellation action is claimed.
+
+Implemented on `feature/return-assessment`: deterministic withdrawal, defect, and preference assessments in `returns.py`, per-reason required facts, order-record checks, provenance-labeled conditions, prompt examples, and 32 tests. Code, security, and bug-diagnosis reviews were run and their confirmed findings fixed (pending operations kept on clarification fallback, facts not carried across orders, stricter receipt-date and order-number filters, date expressions excluded from order numbers, no exception from carried facts, receipt before order date under review, DD/MM/YYYY receipt dates). 310 offline tests pass; live Qwen return and assignment sequences passed.
 
 ## P12 — Add grounded policy explanations and service fallbacks
 

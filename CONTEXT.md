@@ -34,9 +34,10 @@ Windows-hosted Ollama is reachable from WSL at the Windows host address (`ip rou
 - P08 (issue #11) was merged through PR #26 at `6858b10`; all three PR checks passed and issue #11 is closed. It uses Windows-hosted Ollama with the configurable default `qwen2.5:3b`. See `docs/OLLAMA_EVALUATION.md` for actual results and limitations.
 - The package refactor merged through PR #25 at `e0a0aa7`.
 - P09 (issue #12), session-scoped order lookup, merged through PR #28 at `c62720b`; M2 is complete.
-- A minimal P12 slice (policy answers, out-of-scope, small talk, complaints) is in PR #29 from `feature/policy-answers` (278 offline tests; reviews applied; live Qwen sequences passed); remote CI and merge are pending. Issue #20 stays open for the remaining P12 criteria.
+- A minimal P12 slice (policy answers, out-of-scope, small talk, complaints) merged through PR #29 at `8702d8a`. Issue #20 stays open for the remaining P12 criteria.
 - GitHub issue mapping: P10 → #18, P11 → #19, P12 → #20, P13 → #21, P14 → #22 (all open). M0–M2 are complete.
-- Next: P11 (#19), because "Me arrependi da minha compra, posso devolver meu pedido?" is an assignment example and still returns the unavailable message; then P10 (#18), remaining P12, P13, P14. The recruitment deadline is still unknown.
+- P11 (#19), return assessment, is implemented on `feature/return-assessment` (310 offline tests; reviews applied; live Qwen sequences passed); commit and PR are pending. Next fix on a separate branch: "Qual o endereço da loja?" is sometimes answered as out of scope because the policy model returns covered=false; answer the address deterministically from §1.2.
+- Next: P10 (#18), remaining P12, P13, P14. The recruitment deadline is still unknown.
 - Known pre-existing defects (also on main before P09, not yet fixed): quoting a displayed list item replaces the displayed list with only that product, so a following ordinal may fail; a quote without a product after `/cancelar` clears the selection.
 - A manual test guide was drafted in chat but not saved to the repository.
 

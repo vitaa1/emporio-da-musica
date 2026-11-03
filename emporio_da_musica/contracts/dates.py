@@ -22,6 +22,10 @@ def resolve_receipt_date(value: str, today: date) -> date:
         result = today - timedelta(days=relative[value])
     elif re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
         result = date.fromisoformat(value)
+    elif match := re.fullmatch(r"([0-9]{2})/([0-9]{2})/([0-9]{4})", value):
+        # Brazilian day/month/year with an explicit year is unambiguous.
+        day, month, year = map(int, match.groups())
+        result = date(year, month, day)
     else:
         raise ValueError("An unambiguous receipt date is required")
     if result > today:
