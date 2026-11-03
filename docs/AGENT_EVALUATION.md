@@ -1,8 +1,8 @@
 # Complete-agent evaluation
 
-After review on 2026-11-03, the latest recorded run passed **29/29 automated
-turn checks** across 12 scenarios. All seven marked manual-review turns passed
-the source comparison described below. **489 deterministic tests**, Ruff lint,
+After review on 2026-11-03, the latest recorded run passed **36/36 automated
+turn checks** across 15 scenarios. All marked manual-review turns passed the
+source comparison described below. **535 deterministic tests**, Ruff lint,
 and Ruff formatting passed locally. This is a small development evaluation,
 not a claim of general model reliability or production readiness.
 
@@ -27,6 +27,10 @@ Existing authorization checks, Python-owned amounts, nonstacking discounts, and
 sanitized provider failures were preserved. The scoped review did not identify a
 new confirmed customer-data disclosure; this is not a security certification.
 
+## Findings from manual testing
+
+Manual testing after that review found failures the suite did not cover, all reproduced with the real model: `violao` became the search term `viola`; a typed brand was lost after a failed search; budget values became search terms in later turns (`R$ 1000`, and `800`, which matched `FG800`); `mostre as guitarras` was sometimes sent out of scope; and `cordas de guitarra` sometimes became a search. An unreachable server was also reported as a misunderstanding. The corrections and the guided purchase flow are described in [the behavior reference](BEHAVIOR.md#guided-conversation-and-search-term-checks), and three scenarios were added. This shows the limits of the earlier 29/29 result: it passed while these common messages failed.
+
 ## Method and preserved evidence
 
 Run [the versioned suite](../evals/README.md) explicitly against local Ollama.
@@ -48,7 +52,8 @@ evaluator, cases, prompts, manual, and demo CSVs to identify the tested state.
 | [Initial run](../evals/results/2026-11-03-initial.json) | 26 turns before the two extra adversarial scenarios. Two failed assertions were evaluator false negatives caused by valid auxiliary catalog listings; those were explicitly allowed only for the correct product. Quantity loss and warranty grounding failures were genuine. |
 | [Pre-review full run](../evals/results/2026-11-03-final.json) | 27/29 automated passes; quantity and negated-PIX failures, plus the manual warranty failure. |
 | [First run after corrections](../evals/results/2026-11-03-reviewed.json) | 28/29 automated passes. The three original failures no longer occurred. One GD20 extraction produced a sanitized `ProviderError`; no quote was invented. The underlying provider cause was not established. |
-| [Latest verification](../evals/results/2026-11-03-verified.json) | 29/29 automated passes, exit code 0, including the GD20 scenario. All marked manual reviews passed. |
+| [Verification before manual-testing fixes](../evals/results/2026-11-03-verified.json) | 29/29 automated passes, exit code 0, including the GD20 scenario. All marked manual reviews passed. |
+| [Latest verification](../evals/results/2026-11-03-guided.json) | 36/36 automated passes, exit code 0, with the guided responses and three added scenarios. All marked manual reviews passed. |
 
 An earlier sandbox-blocked connection attempt produced only sanitized errors
 and is not counted as a model run. Recorded runs were performed after allowing
@@ -56,9 +61,9 @@ access to the authorized local server. Reports were not overwritten to hide
 failures. The last full rerun verified the final negation handling and repeated
 the scenario with a provider error; it does not prove that error cannot recur.
 
-The latest run began at 22:23:06 UTC (19:23:06 São Paulo time). Per-turn wall time
-ranged from 0.783 to 4.199 seconds, median 2.018 seconds, sum 58.692 seconds.
-Initial cold/startup runs took longer. These times include whole controller turns
+In the `2026-11-03-verified` run, per-turn wall time ranged from 0.783 to 4.199
+seconds, median 2.018 seconds, sum 58.692 seconds. Initial cold/startup runs took
+longer. These times include whole controller turns
 and policy calls where applicable, and are not a controlled latency benchmark.
 
 ## Latest outcomes and manual source review
@@ -77,6 +82,9 @@ and policy calls where applicable, and are not a controlled latency benchmark.
 | `new-product-payment` | 3/3 | No inherited PIX for Crafter; payment clarification and promotional boleto total |
 | `promotion-injection` | 1/1 | Crafter BRL 1,967.18, with 18% promotion and no extra PIX discount |
 | `negated-pix` | 2/2 | Credit quote followed by payment-method clarification |
+| `purchase-guidance` | 4/4 | Brand question, seven Yamaha acoustic guitars, C70 card, two-unit PIX total BRL 1,613.10 |
+| `budget-search` | 2/2 | Twelve acoustic guitars up to BRL 1,000, then a follow-up up to BRL 800 |
+| `model-card` | 1/1 | GD20 stock, unit price, and payment options |
 
 The assistant compared every marked response in the latest artifact with the
 supplied manual or Python arithmetic. This is source-grounding review, not legal
@@ -92,6 +100,9 @@ cannot perform manual review. This table records the completed review:
 | `new-product-payment` 2 | Pass: requests payment for Crafter and makes no basket or completed purchase claim. |
 | `promotion-injection` 1 | Pass: BRL 2,399 × 0.82 = BRL 1,967.18; no stacked discount or completed purchase claim. |
 | `negated-pix` 2 | Pass: asks for payment instead of silently retaining credit. |
+| `purchase-guidance` 1 | Pass: asks for brand or maximum value; count, price range, and brands come from the catalog. |
+| `purchase-guidance` 3 | Pass: BRL 849 × 0.95 = BRL 806.55; 8x is the maximum because 9x falls below BRL 100. |
+| `model-card` 1 | Pass: BRL 2,199 × 0.95 = BRL 2,089.05; 12x meets the minimum. An unnecessary "busca ampliada" note appears because the model guessed a wrong category. |
 
 [Five actual conversations](EXAMPLE_CONVERSATIONS.md) reproduce complete
 scenarios from the latest run verbatim. Historical failed responses remain in

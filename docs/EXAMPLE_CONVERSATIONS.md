@@ -1,35 +1,27 @@
 # Recorded example conversations
 
 Recorded on 2026-11-03 with local `qwen2.5:3b` and bundled synthetic demo data.
-These are five complete scenarios from the [latest verification](../evals/results/2026-11-03-verified.json),
+These are five complete scenarios from the [latest verification](../evals/results/2026-11-03-guided.json),
 captured through `Controller.handle`, the same application boundary used by the CLI.
 Messages and responses below are verbatim, not illustrative rewrites. Each scenario starts a fresh session.
 See the [evaluation report](AGENT_EVALUATION.md) for earlier failures, corrections, and remaining limitations.
 
-## Catalog references, quantity, and payment changes
+## Guided purchase: from a broad request to an exact quote
 
-Scenario: `catalog-reference`. Simulated customer: `None`.
+Scenario: `purchase-guidance`. Simulated customer: `None`.
 
 ### Turn 1
 
 Customer:
 
 ```text
-Liste os violões da Yamaha
+Quero comprar um violão
 ```
 
 Assistant:
 
 ```text
-1. Yamaha C40 Nylon Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 599,90. Total para 1 unidade(s): R$ 599,90 (pagamento não informado). Consulta de preço unitário: quantidade considerada igual a 1. Sem desconto PIX enquanto o pagamento não for informado.
-2. Yamaha C70 Nylon Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 849,00. Total para 1 unidade(s): R$ 849,00 (pagamento não informado). Consulta de preço unitário: quantidade considerada igual a 1. Sem desconto PIX enquanto o pagamento não for informado.
-3. Yamaha F310 Aço Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 699,90. Total para 1 unidade(s): R$ 699,90 (pagamento não informado). Consulta de preço unitário: quantidade considerada igual a 1. Sem desconto PIX enquanto o pagamento não for informado.
-4. Yamaha FG800 Dreadnought Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 1.299,00. Total para 1 unidade(s): R$ 1.299,00 (pagamento não informado). Consulta de preço unitário: quantidade considerada igual a 1. Sem desconto PIX enquanto o pagamento não for informado.
-5. Yamaha NTX1 Elétrico Nylon Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 3.499,00. Total para 1 unidade(s): R$ 3.499,00 (pagamento não informado). Consulta de preço unitário: quantidade considerada igual a 1. Sem desconto PIX enquanto o pagamento não for informado.
-6. Yamaha APX600 Elétrico Aço Preto — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 1.899,00. Total para 1 unidade(s): R$ 1.899,00 (pagamento não informado). Consulta de preço unitário: quantidade considerada igual a 1. Sem desconto PIX enquanto o pagamento não for informado.
-7. Yamaha CG162S Nylon Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 1.699,00. Total para 1 unidade(s): R$ 1.699,00 (pagamento não informado). Consulta de preço unitário: quantidade considerada igual a 1. Sem desconto PIX enquanto o pagamento não for informado.
-
-Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada.
+Boa escolha! Temos 35 opções em Violões. Os preços de tabela vão de R$ 429,90 a R$ 12.000,00. Algumas marcas: Yamaha, Tagima, Giannini, Rozini, Shelby, Crafter. Você tem preferência de marca ou um valor máximo? Se preferir, peça para eu mostrar as opções.
 ```
 
 ### Turn 2
@@ -37,15 +29,22 @@ Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi rea
 Customer:
 
 ```text
-Quanto custa 1 unidade do segundo no pix?
+Yamaha
 ```
 
 Assistant:
 
 ```text
-2. Yamaha C70 Nylon Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 849,00. Desconto PIX: 5%. Total para 1 unidade(s): R$ 806,55 (PIX).
+1. Yamaha C40 Nylon Natural — R$ 599,90
+2. Yamaha C70 Nylon Natural — R$ 849,00
+3. Yamaha F310 Aço Natural — R$ 699,90
+4. Yamaha FG800 Dreadnought Natural — R$ 1.299,00
+5. Yamaha NTX1 Elétrico Nylon Natural — R$ 3.499,00
+6. Yamaha APX600 Elétrico Aço Preto — R$ 1.899,00
+7. Yamaha CG162S Nylon Natural — R$ 1.699,00
+Qual modelo te interessa?
 
-Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada.
+Nada foi comprado ou reservado; valores do catálogo da loja.
 ```
 
 ### Turn 3
@@ -53,17 +52,24 @@ Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi rea
 Customer:
 
 ```text
-E se forem 2 unidades?
+Quero o segundo
 ```
 
 Assistant:
 
 ```text
-2. Yamaha C70 Nylon Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 849,00. Desconto PIX: 5%. Total para 2 unidade(s): R$ 1.613,10 (PIX).
+2. Yamaha C70 Nylon Natural
+Em estoque: 8 unidade(s).
+Preço por unidade: R$ 849,00.
+Formas de pagamento:
+- PIX: R$ 806,55 (5% de desconto)
+- Débito: R$ 849,00
+- Boleto: R$ 849,00
+- Crédito: até 8x sem juros, total de R$ 849,00
 
-Usei dados já informados na cotação anterior deste produto; informe outros se quiser mudar.
+Nada foi comprado ou reservado; valores do catálogo da loja.
 
-Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada.
+Para continuar, informe a quantidade, a forma de pagamento.
 ```
 
 ### Turn 4
@@ -71,17 +77,15 @@ Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi rea
 Customer:
 
 ```text
-E em 10 vezes no crédito?
+2 unidades no pix
 ```
 
 Assistant:
 
 ```text
-2. Yamaha C70 Nylon Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 849,00. Total para 2 unidade(s): R$ 1.698,00 (crédito). Parcelamento sem juros: 10x de R$ 169,80.
+2. Yamaha C70 Nylon Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 849,00. Desconto PIX: 5%. Total para 2 unidade(s): R$ 1.613,10 (PIX).
 
-Usei dados já informados na cotação anterior deste produto; informe outros se quiser mudar.
-
-Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada.
+Nada foi comprado ou reservado; valores do catálogo da loja.
 ```
 
 ## Installments and destination-dependent freight
@@ -101,7 +105,7 @@ Assistant:
 ```text
 1. Takamine GD20 Dreadnought Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 2.199,00. Total para 1 unidade(s): R$ 2.199,00 (crédito). Parcelamento sem juros: 10x de R$ 219,90.
 
-Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada.
+Nada foi comprado ou reservado; valores do catálogo da loja.
 ```
 
 ### Turn 2
@@ -119,7 +123,7 @@ Assistant:
 Entrega em Campo Grande/MS: frete grátis (pedido acima de R$ 500,00). Subtotal dos produtos: R$ 2.089,05; total com frete: R$ 2.089,05.
 Prazo estimado pelo manual: 1 a 3 dias úteis, por motoboy próprio. É uma estimativa, não uma data de entrega garantida. (Manual da loja, seção 5.1.)
 
-Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada.
+Nada foi comprado ou reservado; valores do catálogo da loja.
 ```
 
 ### Turn 3
@@ -198,6 +202,38 @@ Assistant:
 Para continuar, informe o número do pedido.
 ```
 
+## Return assessment with missing facts
+
+Scenario: `withdrawal`. Simulated customer: `None`.
+
+### Turn 1
+
+Customer:
+
+```text
+Me arrependi da compra e quero devolver
+```
+
+Assistant:
+
+```text
+Para continuar, informe se a compra foi feita online ou na loja física, a data em que você recebeu o produto (por exemplo, 01/11/2026, hoje ou ontem), o estado do produto (se está na embalagem original, se tem sinais de uso, se tem todos os acessórios e manuais, se tem personalização ou ajuste sob encomenda e se foi comprado com aviso de venda final).
+```
+
+### Turn 2
+
+Customer:
+
+```text
+Comprei pela internet e recebi ontem
+```
+
+Assistant:
+
+```text
+Para continuar, informe o estado do produto (se está na embalagem original, se tem sinais de uso, se tem todos os acessórios e manuais, se tem personalização ou ajuste sob encomenda e se foi comprado com aviso de venda final).
+```
+
 ## Grounded policy answers and conflicting contacts
 
 Scenario: `policy-grounding`. Simulated customer: `None`.
@@ -246,60 +282,4 @@ Assistant:
 
 ```text
 O manual da loja traz telefones e e-mails divergentes, então não posso indicar um contato oficial com segurança. O endereço da loja é Rua 14 de Maio, 3200 — Centro, Campo Grande/MS, CEP 79202-333 (manual, seção 1.2).
-```
-
-## New product, missing payment, and a promotion
-
-Scenario: `new-product-payment`. Simulated customer: `None`.
-
-### Turn 1
-
-Customer:
-
-```text
-Quero uma unidade do Yamaha C40 no pix
-```
-
-Assistant:
-
-```text
-1. Yamaha C40 Nylon Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 599,90. Desconto PIX: 5%. Total para 1 unidade(s): R$ 569,91 (PIX).
-
-Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada.
-```
-
-### Turn 2
-
-Customer:
-
-```text
-Adicione uma unidade do Crafter HT-100
-```
-
-Assistant:
-
-```text
-1. Crafter HT-100 Folk Aço Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 2.399,00. Promoção ativa: 18% (sem desconto PIX adicional). Total para 1 unidade(s): R$ 1.967,18 (pagamento não informado). Consulta de preço unitário: quantidade considerada igual a 1. Sem desconto PIX enquanto o pagamento não for informado.
-
-Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada.
-
-Para continuar, informe a forma de pagamento.
-```
-
-### Turn 3
-
-Customer:
-
-```text
-Boleto
-```
-
-Assistant:
-
-```text
-1. Crafter HT-100 Folk Aço Natural — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 2.399,00. Promoção ativa: 18% (sem desconto PIX adicional). Total para 1 unidade(s): R$ 1.967,18 (boleto).
-
-Usei dados já informados na cotação anterior deste produto; informe outros se quiser mudar.
-
-Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada.
 ```
