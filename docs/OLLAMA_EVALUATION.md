@@ -63,3 +63,13 @@ Qwen preserved Yamaha C70 Nylon Natural, quantity 1 then 2, PIX, and expected to
 ## Review corrections
 
 Code and security review identified that interrupted chunked HTTP bodies and deeply nested response JSON could escape the provider error boundary and terminate the CLI. The adapter now converts `HTTPException` and `RecursionError` into the same sanitized `ProviderError`. Offline regressions exercise a real `HTTPResponse` with a truncated chunked body and a deeply nested 40 KB JSON envelope. All 209 deterministic tests and Ruff lint/format checks passed after the fix. No prompt or business-rule changes were made by this correction; the live evaluation above was not repeated.
+
+## Order lookup evaluation (P09)
+
+On 2026-11-03, `qwen2.5:3b` was run with unchanged transport settings against the bundled demonstration data, simulated customer 3, and the prompt including the two new `order_status` examples. Sequence: own order 1; "E o rastreio dele?"; foreign order 9; "Quero consultar meu pedido"; "É o número 19"; a Yamaha catalog search.
+
+The first run passed five of six turns. After the foreign-order turn, the model copied order number 9 from history into "Quero consultar meu pedido", producing `not_found` instead of a request for the number. The extracted schema was valid; the error was semantic. The controller now discards an extracted `order_id` whose digits do not appear in the current message. The rerun passed all six turns: two successful own-order lookups (the second reusing the order in focus), a nonrevealing `not_found`, `needs_information`, a pending-update success for order 19, and a catalog search. The original three-turn catalog smoke sequence also passed again. These are single development runs informed by the observed failure, not an independent accuracy estimate.
+
+## Quote clarification follow-up
+
+During manual testing on 2026-11-03, "Quero 1 unidade do Yamaha C70" correctly asked for the payment method, but answering "PIX" then asked for the quantity again. Raw `qwen2.5:3b` output showed a new `payment_options` turn for the selected product with quantity omitted, instead of a pending update, so the pending quote and its declared quantity were replaced. The controller now carries declared facts into a new quote for the same pending product (see CONTRACT.md). Three live sequences ("PIX", "pix", "no PIX", with and without a prior search) then completed the quote in one step. 224 offline tests pass.

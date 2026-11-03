@@ -18,6 +18,7 @@ HELP = """Demonstração offline, sem modelo de linguagem.
 /escolher POSICAO — responder à seleção pendente
 /quantidade NUMERO — responder à quantidade pendente
 /pagamento FORMA — responder à forma de pagamento pendente
+/pedido [NUMERO] — consultar pedido do cliente simulado (requer --customer-id)
 /cancelar — cancelar consultas pendentes
 /sair — encerrar
 """
@@ -28,6 +29,7 @@ COMMAND_USAGE = {
     "/escolher": "Use /escolher POSICAO. Exemplo: /escolher 1.",
     "/quantidade": "Use /quantidade NUMERO. Exemplo: /quantidade 1.",
     "/pagamento": "Use /pagamento FORMA. Exemplo: /pagamento pix.",
+    "/pedido": "Use /pedido NUMERO. Exemplo: /pedido 4.",
 }
 UPDATE_FIELDS = {
     "/escolher": "product_reference",
@@ -42,7 +44,12 @@ def demo_guidance(message, session):
     if not parts:
         return "Digite /buscar NOME para começar ou /ajuda para ver os comandos."
     command, args = parts[0], parts[1:]
-    if command in COMMAND_USAGE:
+    if command == "/pedido":
+        if len(args) > 1 or not all(
+            value.isascii() and value.isdecimal() and int(value) > 0 for value in args
+        ):
+            return COMMAND_USAGE[command]
+    elif command in COMMAND_USAGE:
         expected = 3 if command == "/preco" else 1
         valid = len(args) == expected
         if valid and command in {"/preco", "/escolher", "/quantidade"}:
@@ -74,6 +81,12 @@ def run_cli(controller, source, destination):
         else "Olá! Sou o assistente do Empório da Música. Conte o que você procura. Use /sair para encerrar e /cancelar para cancelar consultas pendentes.\n"
     )
     destination.write(help_text)
+    customer_id = controller.session.simulated_customer_id
+    if customer_id is not None:
+        destination.write(
+            f"Sessão de demonstração do cliente simulado {customer_id}; "
+            "isto não é autenticação real.\n"
+        )
     try:
         while True:
             destination.write("> ")
@@ -122,6 +135,11 @@ def main():
     parser.add_argument("--model", default=os.getenv("OLLAMA_MODEL", "qwen2.5:3b"))
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--manual", type=Path, help="Reviewed UTF-8 manual text")
+    parser.add_argument(
+        "--customer-id",
+        type=int,
+        help="Simulated customer for order lookup (demonstration, not authentication)",
+    )
     args = parser.parse_args()
     try:
         snapshot = load_snapshot(args.data_dir)
@@ -141,9 +159,15 @@ def main():
         )
     except (ValueError, OSError):
         parser.exit(1, "Invalid provider configuration or unreadable manual.\n")
-    controller = Controller(
-        snapshot, provider, clock=lambda: datetime.now(timezone.utc)
-    )
+    try:
+        controller = Controller(
+            snapshot,
+            provider,
+            clock=lambda: datetime.now(timezone.utc),
+            customer_id=args.customer_id,
+        )
+    except ValueError:
+        parser.exit(1, "Unknown simulated customer.\n")
     run_cli(controller, sys.stdin, sys.stdout)
 
 
