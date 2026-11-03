@@ -30,9 +30,9 @@ Windows-hosted Ollama is reachable from WSL at the Windows host address (`ip rou
 
 ## Current project status
 
-- Local main includes PR #35 at `38acf3c`. P13 work is on `test/agent-evaluation`, uncommitted at this handoff: a versioned 12-scenario evaluator, preserved before/after runs, five real conversations, and a review report. See `docs/AGENT_EVALUATION.md`. All 489 offline tests and Ruff checks pass locally; remote CI for these changes has not run.
+- P13 (#21) merged through PR #36 at `b1bcde7`; CI passed on all three platforms. P14 (#22) is in progress on `docs/final-readme-submission`. P13 delivered a versioned 12-scenario evaluator, preserved before/after runs, five real conversations, and a review report. See `docs/AGENT_EVALUATION.md`. All 489 offline tests and Ruff checks pass.
 - Review corrected quantity loss on recognized payment-only follow-ups, non-PIX methods copied without current-message evidence, warranty-only policy prose (now a fixed manual summary), and order-dependent evaluation matching. The final live run passed 29/29 automated checks and all seven marked manual reviews. A preceding run had one sanitized provider error whose underlying cause remains unverified; both runs are preserved. No prompts or dependencies changed.
-- The user authorized local Ollama evaluation and reported the submission deadline as 2026-11-04 23:59, aiming to submit that morning (working-environment local time assumed). Do not change the repository after the deadline. P14 remains next after P13 approval.
+- The user authorized local Ollama evaluation and reported the submission deadline as 2026-11-04 23:59, aiming to submit that morning (working-environment local time assumed). Do not change the repository after the deadline.
 
 Earlier status entries below are historical and may be superseded by the above.
 
@@ -64,7 +64,7 @@ Earlier status entries below are historical and may be superseded by the above.
 
 ## Python and dependency conventions
 
-Python must satisfy `>=3.13,<3.14`. Linux/WSL with Python 3.13 is the dependency-generation reference, deliberately replacing Windows in PR #6. The README and Linux CI use the same pip-tools generation options and header command. Follow README for executable instructions; never hand-edit generated pins.
+Python must satisfy `>=3.13,<3.14`. Linux/WSL with Python 3.13 is the dependency-generation reference, deliberately replacing Windows in PR #6. The README and Linux CI use the same pip-tools generation options and header command. Follow `docs/DEVELOPMENT.md` for executable instructions; never hand-edit generated pins.
 
 Direct development dependencies are pip-tools 7.6.2, Ruff 0.17.3, pytest 9.2.0, and colorama 0.4.6. Colorama is declared explicitly to preserve build's Windows dependency in the shared Linux-generated file. Runtime dependencies are Pydantic 2.14.2 and tzdata 2026.6, pinned in `requirements.txt` and also included in `requirements-dev.txt`. Keep declarations and generated pins together.
 

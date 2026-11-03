@@ -114,8 +114,7 @@ not exhaustive, and no general accuracy percentage or repeated-run guarantee is
 inferred from these counts.
 
 The existing three-platform CI jobs already run all deterministic tests without
-provider credentials. Remote CI for this uncommitted change has not run. No
-commit, push, PR, or merge is implied by this review. P14 remains responsible for
-the final README and clean-environment/submission verification. The user reported
+provider credentials, and they passed on the merge of this evaluation (PR #36).
+The user reported
 a deadline of 2026-11-04 at 23:59, aiming to submit that morning (working-environment
 local time assumed). Do not change the repository after the deadline.
