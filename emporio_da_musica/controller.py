@@ -104,6 +104,18 @@ STORE_ADDRESS = (
     "A loja fica na Rua 14 de Maio, 3200 — Centro, Campo Grande - MS, 79202-333."
 )
 
+# Accessories named in manual §§1 and 7.1. Ambiguous words need context: an
+# instrument "de 7 cordas" or "cordas orquestrais" (a store category), "Cabo
+# Frio", "capa do livro", or a drum "pedal de bateria" are not accessory requests.
+ACCESSORY_WORDS = re.compile(
+    r"\bacessorios?\b|\bencordoamentos?\b|\bpalhetas?\b|\bpedaleiras?\b"
+    r"|\bamplificador(?:es)?\b|\bpedais\b(?! de bateria)"
+    r"|\bpedal (?:de efeito|para guitarra|pra guitarra)\b"
+    r"|(?<![0-9] )\bcordas?\b(?! orquestra)"
+    r"|\b(?:cabos|capas|cases)\b(?! d[oa]s? )"
+    r"|\b(?:cabo|capa|case) (?:de|para|pra|p10|p2)\b"
+)
+
 QUOTES = (PaymentOptions, ShippingQuote)
 FREE_FREIGHT_ABOVE = Decimal("500")  # Supplied manual §5.1.
 LOCAL_FREIGHT = Decimal("35")
@@ -176,6 +188,7 @@ class Controller:
         # Facts of the last successful quote: (product ID, executed intent).
         self._last_quote = None
         self._reused_quote = False
+        self._intent_count = 1
 
     def handle(self, message: str) -> TurnResponse:
         if (
@@ -269,6 +282,7 @@ class Controller:
         typed_numbers = {int(n) for n in re.findall(r"[0-9]+", order_text)}
         self._typed_order_numbers = typed_numbers
         self._message = message
+        self._intent_count = len(intents)
         # Budgets and model-written search terms follow the same rule: values copied
         # from history or invented by the model must not hide or replace products.
         typed_amounts = _typed_amounts(message)
@@ -340,7 +354,15 @@ class Controller:
             elif isinstance(intent, QUOTES) and resolved is None:
                 selected = None
             if choices is not None:
-                if choices is not outcome:
+                # A unique name match quoted successfully is already shown by the
+                # quote; the search line is kept only for choices or failures.
+                unique_quote = (
+                    choices.data.total_matches == 1
+                    and resolved == choices.data.products[0].product_id
+                    and outcome.status == "success"
+                    and isinstance(outcome, (PaymentOptionsResult, ShippingQuoteResult))
+                )
+                if choices is not outcome and not unique_quote:
                     results.append(choices)
                 ids = tuple(q.product_id for q in choices.data.products)
                 shown.extend(i for i in ids if i not in shown)
@@ -429,7 +451,7 @@ class Controller:
         if isinstance(intent, PolicyQuestion):
             return self._policy(intent), None, None
         if isinstance(intent, OutOfScope):
-            return OutOfScopeResult(status="success", data=OutOfScopeData()), None, None
+            return self._out_of_scope(intent.topic), None, None
         if isinstance(intent, Complaint):
             return ComplaintResult(status="success", data=ComplaintData()), None, None
         if isinstance(intent, SmallTalk):
@@ -579,8 +601,8 @@ class Controller:
         except NotCovered:
             if ADDRESS_ONLY.match(normalize(question)):
                 return self._store_address()
-            # Uncovered or unrelated questions get the fixed scope template.
-            return OutOfScopeResult(status="success", data=OutOfScopeData())
+            # Uncovered or unrelated questions get a fixed scope template.
+            return self._out_of_scope(None)
         except ContactConflict:
             return _result(intent.type, "requires_confirmation", "CONTACT_CONFLICT")
         except (PolicyAnswerError, ProviderError) as error:
@@ -590,6 +612,24 @@ class Controller:
             return _result(intent.type, "error", "POLICY_ANSWER_FAILED")
         return PolicyQuestionResult(
             status="success", data=data, policy_references=data.policy_references
+        )
+
+    def _out_of_scope(self, topic):
+        """Accessory requests get the store-scope message; other topics a general one."""
+        # The model's short topic is checked when present; the message is used
+        # only when no topic exists and it holds a single request, so words that
+        # belong to another intent in the same turn are not counted.
+        if topic:
+            text = normalize(topic)
+        elif self._intent_count == 1:
+            text = normalize(self._message)
+        else:
+            text = ""
+        template = (
+            "accessory_redirect" if ACCESSORY_WORDS.search(text) else "scope_redirect"
+        )
+        return OutOfScopeResult(
+            status="success", data=OutOfScopeData(template=template)
         )
 
     def _contact_notice(self, results, intents):

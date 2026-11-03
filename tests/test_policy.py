@@ -141,6 +141,7 @@ def test_out_of_scope_redirects_without_partner_stores(app):
     assert response.results[0].status == "success"
     assert "exclusivamente com instrumentos" in response.text
     assert "não indico outras lojas" in response.text
+    assert response.results[0].data.template == "accessory_redirect"
 
 
 @pytest.mark.parametrize(
@@ -211,6 +212,7 @@ def test_uncovered_question_uses_scope_template_not_model_prose(app):
     assert response.results[0].operation == "out_of_scope"
     assert "Paris" not in response.text
     assert "foge do que eu consigo atender" in response.text
+    assert "cordas" not in response.text
 
 
 def test_uncovered_answer_may_omit_text_and_sections(app):
@@ -390,3 +392,79 @@ def test_address_is_not_repeated_next_to_contact_notice(app):
     assert response.text.count("Rua 14 de Maio") == 1
     assert "divergentes" in response.text
     assert "seção 2" in response.text
+
+
+@pytest.mark.parametrize(
+    ("topic", "message", "template"),
+    [
+        ("cordas", "Vocês vendem cordas de nylon?", "accessory_redirect"),
+        ("capas", "Tem capa pra violão?", "accessory_redirect"),
+        (None, "Vocês têm amplificador?", "accessory_redirect"),
+        ("futebol", "Quem ganhou a Copa de 2002?", "scope_redirect"),
+        ("geografia", "Qual a capital da França?", "scope_redirect"),
+    ],
+)
+def test_accessories_and_unrelated_topics_get_distinct_redirects(
+    app, topic, message, template
+):
+    response = turn(app, {"type": "out_of_scope", "topic": topic}, message=message)
+    assert response.results[0].data.template == template
+    accessory = template == "accessory_redirect"
+    assert ("exclusivamente com instrumentos" in response.text) is accessory
+    assert "não indico outras lojas" in response.text or not accessory
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "violão de 7 cordas",
+        "cordas orquestrais",
+        "in case you know",
+        "cabo do exército",
+        "Cabo Frio",
+        "capa do livro",
+        "pedal de bateria",
+        "previsão do tempo",
+    ],
+)
+def test_non_accessory_wording_gets_general_redirect(app, text):
+    response = turn(app, {"type": "out_of_scope", "topic": text}, message=text)
+    assert response.results[0].data.template == "scope_redirect"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "cordas de nylon",
+        "jogo de cordas",
+        "encordoamento",
+        "palheta",
+        "cabo para guitarra",
+        "capa pra violão",
+        "case de teclado",
+        "pedais de efeito",
+        "pedaleira",
+        "amplificador",
+    ],
+)
+def test_accessory_wording_gets_accessory_redirect(app, text):
+    response = turn(app, {"type": "out_of_scope", "topic": text}, message=text)
+    assert response.results[0].data.template == "accessory_redirect"
+
+
+def test_accessory_word_of_another_intent_is_not_counted(app):
+    response = turn(
+        app,
+        search("Piano"),
+        {"type": "out_of_scope", "topic": "previsão do tempo"},
+        message="O Piano tem pedais? E qual a previsão do tempo?",
+    )
+    assert response.results[-1].data.template == "scope_redirect"
+
+
+def test_message_without_topic_is_used_only_for_single_request(app):
+    message = "Vocês vendem palhetas? E o Piano?"
+    response = turn(app, {"type": "out_of_scope"}, search("Piano"), message=message)
+    assert response.results[0].data.template == "scope_redirect"
+    response = turn(app, {"type": "out_of_scope"}, message="Vocês vendem palhetas?")
+    assert response.results[0].data.template == "accessory_redirect"

@@ -82,7 +82,7 @@ class ComplaintData(Contract):
 
 
 class OutOfScopeData(Contract):
-    template: Literal["scope_redirect"] = "scope_redirect"
+    template: Literal["scope_redirect", "accessory_redirect"] = "scope_redirect"
 
 
 class SmallTalkData(Contract):

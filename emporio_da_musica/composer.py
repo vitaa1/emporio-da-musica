@@ -50,7 +50,8 @@ TEMPLATES = {
     "greeting": "Olá! Que bom ter você por aqui no Empório da Música. Posso ajudar com instrumentos, preços, pedidos e políticas da loja.",
     "thanks": "Imagina, foi um prazer ajudar! Se precisar de mais alguma coisa, é só chamar.",
     "goodbye": "Até mais! Boa música e conte com a gente quando precisar.",
-    "scope_redirect": "Esse assunto foge do que eu consigo atender. O Empório da Música trabalha exclusivamente com instrumentos musicais — não vendemos acessórios como cordas, cabos, palhetas, pedais, amplificadores ou cases, e não indico outras lojas. Posso ajudar você a encontrar um instrumento?",
+    "accessory_redirect": "Esse item a gente não tem: o Empório da Música trabalha exclusivamente com instrumentos musicais e não vende acessórios como cordas, cabos, palhetas, pedais, amplificadores ou cases. Também não indico outras lojas. Posso ajudar você a encontrar um instrumento?",
+    "scope_redirect": "Esse assunto foge do que eu consigo atender por aqui. Posso ajudar com instrumentos musicais, preços e disponibilidade, pedidos, trocas e devoluções, formas de pagamento, frete e horários da loja.",
     "complaint_acknowledgment": "Sinto muito pela experiência, e obrigado por nos contar. Eu não consigo registrar reclamações nem encaminhar o atendimento por aqui, então nada foi registrado ainda. Para formalizar, procure a equipe da loja (Rua 14 de Maio, 3200 — Centro, Campo Grande/MS); pelo manual, o retorno da equipe é previsto em até 24 horas úteis após o registro.",
 }
 POLICY_FOOTER = "Explicação geral com base no manual da loja; casos específicos dependem dos dados do pedido e não foram aprovados aqui."
