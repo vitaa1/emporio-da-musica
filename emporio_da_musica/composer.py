@@ -119,7 +119,7 @@ PROVENANCE = {
 }
 RETURN_FOOTER = "Avaliação preliminar com base no manual e nas informações disponíveis; nenhuma devolução, troca ou reembolso foi solicitado, aprovado ou realizado. Para dar andamento, procure a equipe da loja."
 
-QUOTE_FACTS_REUSED = "Usei a quantidade, a forma de pagamento e o destino já informados na cotação anterior deste produto, quando não foram repetidos; informe outros dados se quiser mudar."
+QUOTE_FACTS_REUSED = "Usei dados já informados na cotação anterior deste produto; informe outros se quiser mudar."
 CITY_ASSUMED = "City without state assumed to be Campo Grande/MS."
 SMALL_INSTALLMENTS_NOTE = "Parcelar em 2 ou 3 vezes precisa de confirmação da loja."
 

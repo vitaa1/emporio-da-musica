@@ -459,3 +459,397 @@ def test_ambiguous_name_quote_still_lists_choices(app):
     )
     assert "Violão A" in response.text and "Violão B" in response.text
     assert response.results[-1].missing_fields == ("product_reference",)
+
+
+def test_quoting_a_list_item_keeps_the_list_for_later_ordinals(app):
+    turn(app, search("Violão"))
+    first = turn(
+        app,
+        payment(
+            product_reference={"kind": "ordinal", "ordinal": 1},
+            quantity=1,
+            payment_method="pix",
+        ),
+    )
+    assert app.session.displayed_product_ids == (10, 20)
+    assert first.text.startswith("1. Violão A")
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "ordinal", "ordinal": 2},
+            quantity=1,
+            payment_method="pix",
+        ),
+    )
+    assert response.results[-1].data.name == "Violão B"
+    assert response.text.startswith("2. Violão B")
+
+
+def test_new_search_still_replaces_the_list(app):
+    turn(app, search("Violão"))
+    turn(app, search("Piano"))
+    assert app.session.displayed_product_ids == (30,)
+
+
+def test_quote_without_product_keeps_selection_after_cancel(app):
+    turn(app, search("Piano"))
+    app.handle("/cancelar")
+    response = turn(app, payment(quantity=1))
+    assert response.results[-1].missing_fields == (
+        "product_reference",
+        "payment_method",
+    )
+    assert app.session.selected_product_id == 30
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "selected"}, quantity=1, payment_method="pix"
+        ),
+    )
+    assert response.results[-1].data.name == "Piano"
+
+
+def test_unresolved_reference_still_drops_selection(app):
+    turn(app, search("Piano"))
+    turn(app, payment(product_reference={"kind": "ordinal", "ordinal": 9}))
+    assert app.session.selected_product_id is None
+
+
+@pytest.mark.parametrize("query", ["débito", "no cartão", "PIX", "à vista"])
+def test_payment_word_is_not_a_product_reference(app, query):
+    turn(app, search("Piano"))
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": query},
+            quantity=1,
+            payment_method="debit",
+        ),
+        message=f"Quanto fica {query} no débito?",
+    )
+    assert response.results[-1].missing_fields == ("product_reference",)
+    assert "Não encontrei" not in response.text
+
+
+def test_payment_word_reference_in_update_is_dropped(app):
+    turn(app, search("Violão"))
+    turn(
+        app,
+        payment(
+            product_reference={"kind": "ordinal", "ordinal": 2}, payment_method="pix"
+        ),
+    )
+    response = update(
+        app,
+        product_reference={"kind": "query", "query": "no pix"},
+        quantity=1,
+    )
+    assert response.results[-1].data.name == "Violão B"
+
+
+def test_payment_word_only_update_asks_for_product_again(app):
+    turn(app, payment(quantity=1, payment_method="pix"))
+    response = update(app, product_reference={"kind": "query", "query": "pix"})
+    assert response.results[-1].missing_fields == ("product_reference",)
+
+
+@pytest.mark.parametrize("query", ["avista", "cartaocredito"])
+def test_glued_words_are_not_payment_only(app, query):
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": query},
+            quantity=1,
+            payment_method="pix",
+        ),
+    )
+    assert response.results[-1].reason_code == "NO_CATALOG_MATCH"
+
+
+def test_search_without_results_keeps_the_list(app):
+    turn(app, search("Violão"))
+    turn(app, search("Bateria rosa"))
+    assert app.session.displayed_product_ids == (10, 20)
+
+
+def quote_piano_pix(app):
+    turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Piano"},
+            quantity=1,
+            payment_method="pix",
+        ),
+        message="Uma unidade do Piano no PIX",
+    )
+
+
+def test_payment_copied_to_another_product_is_discarded(app):
+    quote_piano_pix(app)
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Violão A"},
+            quantity=1,
+            payment_method="pix",
+            installments=None,
+        ),
+        message="Adicione uma unidade do Violão A",
+    )
+    assert response.results[-1].missing_fields == ("payment_method",)
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [{"kind": "query", "query": "Piano"}, {"kind": "selected"}],
+)
+def test_same_product_reuses_payment_with_notice(app, reference):
+    quote_piano_pix(app)
+    response = turn(
+        app,
+        payment(product_reference=reference, quantity=2, payment_method="pix"),
+        message="E se forem 2 unidades do Piano?",
+    )
+    assert response.results[-1].data.payment_method == "pix"
+    assert "cotação anterior" in response.text
+
+
+def test_ordinal_to_selected_product_reuses_payment(app):
+    turn(app, search("Violão"))
+    turn(
+        app,
+        payment(
+            product_reference={"kind": "ordinal", "ordinal": 1},
+            quantity=1,
+            payment_method="pix",
+        ),
+        message="O primeiro no pix",
+    )
+    response = turn(
+        app,
+        payment(product_reference={"kind": "ordinal", "ordinal": 1}, quantity=2),
+        message="Duas do primeiro",
+    )
+    assert response.results[-1].data.payment_method == "pix"
+
+
+@pytest.mark.parametrize(
+    ("method", "message"),
+    [
+        ("debit", "uma no cartão"),
+        ("credit", "uma no cartão"),
+        ("credit", "uma parcelado"),
+        ("boleto", "uma no boleto"),
+    ],
+)
+def test_typed_payment_is_accepted(app, method, message):
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Piano"},
+            quantity=1,
+            payment_method=method,
+        ),
+        message=message,
+    )
+    assert response.results[-1].data.payment_method == method
+
+
+def after_pix(app):
+    quote_piano_pix(app)
+    return {"kind": "selected"}
+
+
+@pytest.mark.parametrize(
+    ("message", "fields", "method"),
+    [
+        ("e no credito?", {"payment_method": "credit"}, "credit"),
+        ("seis vezes", {"payment_method": "credit", "installments": 6}, "credit"),
+        ("no boleto", {"payment_method": "boleto"}, "boleto"),
+    ],
+)
+def test_other_method_from_model_replaces_earlier_pix(app, message, fields, method):
+    reference = after_pix(app)
+    response = turn(
+        app, payment(product_reference=reference, **fields), message=message
+    )
+    assert response.results[-1].data.payment_method == method
+    assert "PIX:" not in response.text
+
+
+@pytest.mark.parametrize(
+    ("message", "fields"),
+    [
+        ("e no credito?", {"payment_method": "pix"}),
+        ("no débito", {}),
+        ("e em dinheiro?", {}),
+        ("à vista", {"payment_method": "pix"}),
+        ("não no pix", {}),
+        ("não uso pix", {"payment_method": "pix"}),
+        ("pix não, crédito", {"payment_method": "pix"}),
+        ("em vez de pix, boleto", {"payment_method": "pix"}),
+        ("pix e cartão", {"payment_method": "pix"}),
+        ("e em 10 vezes?", {"payment_method": "pix", "installments": 10}),
+    ],
+)
+def test_payment_doubt_asks_instead_of_discounting(app, message, fields):
+    reference = after_pix(app)
+    response = turn(
+        app, payment(product_reference=reference, **fields), message=message
+    )
+    assert "payment_method" in response.results[-1].missing_fields
+
+
+def test_product_name_with_count_does_not_infer_credit(app):
+    response = turn(
+        app,
+        payment(product_reference={"kind": "query", "query": "Piano"}, quantity=1),
+        message="quanto custa o Piano 2X?",
+    )
+    assert response.results[-1].missing_fields == ("payment_method",)
+
+
+def test_bare_number_reference_is_not_a_payment_word(app):
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "310"},
+            quantity=1,
+            payment_method="pix",
+        ),
+        message="o 310 no pix",
+    )
+    assert response.results[-1].reason_code == "NO_CATALOG_MATCH"
+
+
+@pytest.mark.parametrize("reference", [{"kind": "selected"}, None])
+def test_naming_another_product_blocks_reuse(app, reference):
+    quote_piano_pix(app)
+    fields = {"product_reference": reference} if reference else {}
+    response = turn(app, payment(**fields), message="e o Violão A?")
+    assert "cotação anterior" not in response.text
+    assert "payment_method" in response.results[-1].missing_fields
+
+
+def test_pix_search_then_dependent_quote_keep_the_mention(app):
+    response = turn(
+        app,
+        {"type": "product_search", "query": "Piano", "payment_method": "pix"},
+        payment(
+            product_reference={"kind": "selected"}, quantity=1, payment_method="pix"
+        ),
+        message="Tem Piano? Quanto no pix?",
+    )
+    assert response.results[-1].data.payment_method == "pix"
+
+
+def test_installments_alone_are_not_accepted_as_update(app):
+    turn(
+        app,
+        payment(product_reference={"kind": "query", "query": "Piano"}, quantity=1),
+    )
+    response = update(app, message="sei la", installments=12)
+    assert "Não consegui aplicar" in response.text
+
+
+def test_method_named_once_applies_to_first_request_only(app):
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Violão A"},
+            quantity=1,
+            payment_method="pix",
+        ),
+        payment(
+            product_reference={"kind": "query", "query": "Piano"},
+            quantity=1,
+            payment_method="pix",
+        ),
+        message="Violão A no pix e também o Piano, 1 de cada",
+    )
+    assert response.results[0].data.payment_method == "pix"
+    assert response.results[-1].missing_fields == ("payment_method",)
+
+
+def test_search_drops_copied_method_and_keeps_typed_one(app):
+    copied = turn(
+        app,
+        {"type": "product_search", "query": "Piano", "payment_method": "pix"},
+        message="Tem piano?",
+    )
+    assert copied.results[0].data.products[0].payment_method is None
+    typed = turn(
+        app,
+        {"type": "product_search", "query": "Piano", "payment_method": "pix"},
+        message="Tem piano no pix?",
+    )
+    assert typed.results[0].data.products[0].payment_method == "pix"
+
+
+def test_update_with_method_and_installments_is_accepted(app):
+    turn(
+        app,
+        payment(product_reference={"kind": "query", "query": "Piano"}, quantity=1),
+    )
+    response = update(
+        app, message="no crédito em 6x", payment_method="credit", installments=6
+    )
+    assert response.results[-1].data.installments == 6
+
+
+def test_copied_method_does_not_block_valid_update(app):
+    turn(
+        app,
+        {
+            "type": "shipping_quote",
+            "product_reference": {"kind": "query", "query": "Piano"},
+            "quantity": 1,
+            "payment_method": "boleto",
+        },
+    )
+    response = update(
+        app,
+        message="Campo Grande",
+        destination={"city": "Campo Grande"},
+        payment_method="boleto",
+    )
+    assert response.results[-1].data.quote.payment_method == "boleto"
+
+
+def test_name_from_history_reuses_facts_for_follow_up(app):
+    quote_piano_pix(app)
+    response = turn(
+        app,
+        payment(product_reference={"kind": "query", "query": "Piano"}, quantity=2),
+        message="E se forem 2 unidades?",
+    )
+    assert response.results[-1].data.payment_method == "pix"
+    assert "cotação anterior" in response.text
+
+
+def test_name_from_history_does_not_reuse_when_another_product_is_named(app):
+    quote_piano_pix(app)
+    response = turn(
+        app,
+        payment(product_reference={"kind": "query", "query": "Piano"}, quantity=1),
+        message="adicione um Violão",
+    )
+    assert response.results[-1].missing_fields == ("payment_method",)
+
+
+def test_pending_facts_reuse_is_announced(app):
+    turn(
+        app,
+        {
+            "type": "shipping_quote",
+            "product_reference": {"kind": "query", "query": "Piano"},
+            "quantity": 2,
+            "payment_method": "pix",
+        },
+    )
+    response = turn(
+        app,
+        payment(product_reference={"kind": "selected"}),
+        message="quanto fica?",
+    )
+    assert "cotação anterior" in response.text

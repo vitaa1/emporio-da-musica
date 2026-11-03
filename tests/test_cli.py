@@ -97,3 +97,22 @@ def test_demo_usage_error_preserves_pending_and_valid_selection_still_works(
     assert "R$ 1.900,00" in output.getvalue()
     assert not app.session.pending
     assert not caplog.records
+
+
+def test_demo_commands_accept_every_method():
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from emporio_da_musica.controller import Controller
+    from emporio_da_musica.data.loader import load_snapshot
+    from emporio_da_musica.providers.demo import DemoProvider
+
+    for method in ("pix", "debit", "credit", "boleto"):
+        app = Controller(
+            load_snapshot(Path(__file__).resolve().parents[1] / "data/demo"),
+            DemoProvider(),
+            clock=lambda: datetime.now(timezone.utc),
+        )
+        app.handle("/buscar Takamine GD20")
+        response = app.handle(f"/preco 1 1 {method}")
+        assert response.results[-1].data.payment_method == method

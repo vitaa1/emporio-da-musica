@@ -117,6 +117,34 @@ ACCESSORY_WORDS = re.compile(
 )
 
 QUOTES = (PaymentOptions, ShippingQuote)
+# Only PIX changes a price, so only PIX needs evidence in the current message; a
+# copied or misread PIX would apply an undeclared discount. Parsing Portuguese fully
+# is not attempted: any doubt (negation, another method) fails closed and asks.
+_COUNT = r"(?:[0-9]+|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze)"
+PAYMENT_MENTION = re.compile(
+    r"\b(?:pix|cartao|debito|debit|credito|credit|boleto|dinheiro|parcel\w*|vezes|"
+    r"[0-9]+ ?x|a vista|a prazo|sem juros|combin\w*|meio a meio|dividi\w*)\b"
+)
+_NOT_PIX = re.compile(
+    r"\b(?:nao|sem|nem|vez de|cartao|debito|debit|credito|credit|boleto|dinheiro|"
+    r"parcel\w*|vezes|[0-9]+ ?x|combin\w*|meio a meio|dividi\w*)\b"
+)
+
+
+def pix_declared(message):
+    """PIX named with no negation and no other payment term nearby in the message."""
+    text = normalize(message)
+    return re.search(r"\bpix\b", text) is not None and not _NOT_PIX.search(text)
+
+
+# A product reference made only of payment words ("débito", "no cartão") was
+# invented from the payment method; it never names a product.
+_PAYMENT_WORD = (
+    r"(?:no|na|em|de|a|com|pelo|pela|via|vista|prazo|sem|juros|meio|pagamento|"
+    r"combinado|cartao|credito|debito|pix|boleto|parcelado|parcelas?|vezes|dinheiro|"
+    rf"{_COUNT}x?)"
+)
+PAYMENT_ONLY = re.compile(rf"^{_PAYMENT_WORD}(?:\s+{_PAYMENT_WORD})*\W*$")
 FREE_FREIGHT_ABOVE = Decimal("500")  # Supplied manual §5.1.
 LOCAL_FREIGHT = Decimal("35")
 LOCAL_CITY = "campo grande"
@@ -156,6 +184,44 @@ def _typed_amounts(message):
     if re.search(r"(?<![0-9\s])\s*\bmil\b", message, flags=re.IGNORECASE):
         amounts.add(Decimal(1000))
     return amounts
+
+
+def _payment_only(reference):
+    return (
+        reference is not None
+        and reference.kind == "query"
+        and PAYMENT_ONLY.match(normalize(reference.query)) is not None
+        # A bare number may be a model code ("o 310"), not a payment term.
+        and PAYMENT_MENTION.search(normalize(reference.query)) is not None
+    )
+
+
+def _clean_update(proposal, prior, message):
+    """Drop model inventions from an update that also answers something else.
+
+    A payment-word product reference and an unrequested, untyped payment method
+    would otherwise reject the customer's valid answer. An update left with no
+    other field is returned unchanged for the normal validation.
+    """
+    update = proposal.update
+    if not isinstance(update, QUOTES):
+        return proposal
+    fields = update.model_dump(mode="json", exclude_unset=True)
+    if _payment_only(update.product_reference):
+        fields.pop("product_reference")
+    requested = prior.requested_fields if prior else ()
+    if (
+        "payment_method" in fields
+        and "payment_method" not in requested
+        and not PAYMENT_MENTION.search(normalize(message))
+    ):
+        fields.pop("payment_method")
+        fields.pop("installments", None)
+    if set(fields) <= {"type"} or len(fields) == len(update.model_fields_set):
+        return proposal
+    return ClarificationUpdate(
+        pending_id=proposal.pending_id, update=type(update).model_validate(fields)
+    )
 
 
 def _result(operation, status, reason, missing=()):
@@ -243,6 +309,7 @@ class Controller:
                 ),
                 None,
             )
+            proposal = _clean_update(proposal, prior, message)
             try:
                 if prior is None:
                     raise ValueError("Unknown pending operation")
@@ -303,19 +370,28 @@ class Controller:
                 ):
                     # e.g. "viola" invented for "violões": keep the typed category.
                     intent = intent.model_copy(update={"query": None})
+            if isinstance(intent, QUOTES) and _payment_only(intent.product_reference):
+                intent = intent.model_copy(update={"product_reference": None})
             checked.append(intent)
         intents = checked
         # Facts carried in a merged clarification were checked when first supplied;
         # only values supplied by this proposal must appear in this message.
         supplied = proposal.update.model_fields_set if prior else None
         intents = [
-            self._typed_facts(intent, supplied, typed_numbers) for intent in intents
+            self._typed_payment(
+                self._typed_facts(intent, supplied, typed_numbers), supplied
+            )
+            for intent in intents
         ]
+        if supplied is None or "payment_method" in supplied:
+            # Methods merged from earlier declarations were checked when supplied.
+            intents = self._one_method_per_mention(intents)
         results = []
         shown = []
         selected = self.session.selected_product_id
         selected_order = self.session.selected_order_id
         original_display = self.session.displayed_product_ids
+        listed = False
         for intent in intents:
             pinned = None
             if prior is None:
@@ -351,7 +427,14 @@ class Controller:
                 # or the facts of an earlier quote.
                 selected = None
                 self._last_quote = None
-            elif isinstance(intent, QUOTES) and resolved is None:
+            elif (
+                isinstance(intent, QUOTES)
+                and resolved is None
+                and intent.product_reference is not None
+            ):
+                # Only a reference that failed to resolve drops the selection. A
+                # quote that named no product still asks for it, but keeps the
+                # selection so a later "esse" refers to the same product.
                 selected = None
             if choices is not None:
                 # A unique name match quoted successfully is already shown by the
@@ -364,6 +447,8 @@ class Controller:
                 )
                 if choices is not outcome and not unique_quote:
                     results.append(choices)
+                if choices is outcome or not unique_quote:
+                    listed = True
                 ids = tuple(q.product_id for q in choices.data.products)
                 shown.extend(i for i in ids if i not in shown)
                 selected = ids[0] if choices.data.total_matches == 1 else None
@@ -407,7 +492,10 @@ class Controller:
                     pending.append(item)
         # Each displayed number is global within the response, including independent
         # searches. Incoming ordinals always use the list actually seen last turn.
-        displayed = tuple(shown) if shown else original_display
+        # Quoting items of the list seen last turn keeps that list, so "o segundo"
+        # still works; a new list replaces it only when one was actually shown.
+        keep_list = not listed and all(i in original_display for i in shown)
+        displayed = tuple(shown) if shown and not keep_list else original_display
         if selected not in displayed:
             selected = None
         self.session = _state(
@@ -487,6 +575,67 @@ class Controller:
             changes["received_at"] = None
         return intent.model_copy(update=changes) if changes else intent
 
+    def _typed_payment(self, intent, supplied):
+        """Drop a PIX, and thus its discount, not declared in this message."""
+        if (
+            not isinstance(intent, (ProductSearch, *QUOTES))
+            or intent.payment_method != "pix"
+            or (supplied is not None and "payment_method" not in supplied)
+            or pix_declared(self._message)
+        ):
+            return intent
+        return intent.model_copy(update={"payment_method": None, "installments": None})
+
+    def _one_method_per_mention(self, intents):
+        """One PIX mention discounts the first request and those depending on it."""
+        mentions = len(re.findall(r"\bpix\b", normalize(self._message)))
+        used = 0
+        result = []
+        for intent in intents:
+            if getattr(intent, "payment_method", None) == "pix":
+                reference = getattr(intent, "product_reference", None)
+                if reference is None or reference.kind != "selected":
+                    used += 1
+                if used > mentions:
+                    intent = intent.model_copy(
+                        update={"payment_method": None, "installments": None}
+                    )
+            result.append(intent)
+        return result
+
+    def _names_other_product(self, selected):
+        """Whether the message has a name token exclusive to other catalog products."""
+
+        def tokens(text):
+            return set(
+                re.findall(r"\w{4,}|\w*[a-z]\w*[0-9]\w*|\w*[0-9]\w*[a-z]\w*", text)
+            )
+
+        words = tokens(normalize(self._message))
+        own = tokens(normalize(self.snapshot.products[selected].name))
+        return any(
+            words & (tokens(normalize(product.name)) - own)
+            for product in self.snapshot.products.values()
+        )
+
+    def _same_as_selected(self, reference, selected, original_display):
+        """Whether an ordinal or unique name points to the selected product."""
+        if selected is None:
+            return False
+        if reference.kind == "ordinal":
+            return (
+                reference.ordinal <= len(original_display)
+                and original_display[reference.ordinal - 1] == selected
+            )
+        found = search_catalog(
+            self.snapshot, ProductSearch(type="product_search", query=reference.query)
+        )
+        return (
+            found.status == "success"
+            and found.data.total_matches == 1
+            and found.data.products[0].product_id == selected
+        )
+
     def _carry_return(self, intent):
         """Reuse facts declared for a pending return answered as a new turn."""
         prior = next(
@@ -529,8 +678,16 @@ class Controller:
             return self._carry_return(intent)
         if not isinstance(intent, QUOTES):
             return intent
+        if selected in self.snapshot.products and self._names_other_product(selected):
+            return intent
         reference = intent.product_reference
-        if reference is not None and reference.kind != "selected":
+        if (
+            reference is not None
+            and reference.kind != "selected"
+            and not self._same_as_selected(
+                reference, selected, self.session.displayed_product_ids
+            )
+        ):
             return intent
         prior = next(
             (
@@ -552,7 +709,6 @@ class Controller:
             declared = self._last_quote[1]
         else:
             return intent
-        from_last_quote = prior is None
         changes = {}
         if reference is None:
             changes["product_reference"] = {"kind": "selected"}
@@ -562,6 +718,7 @@ class Controller:
             intent.payment_method is None
             and intent.installments is None
             and declared.payment_method is not None
+            and not PAYMENT_MENTION.search(normalize(self._message))
         ):
             changes["payment_method"] = declared.payment_method
             changes["installments"] = declared.installments
@@ -574,7 +731,7 @@ class Controller:
             changes["destination"] = declared.destination.model_dump()
         if not changes:
             return intent
-        if from_last_quote and set(changes) - {"product_reference"}:
+        if set(changes) - {"product_reference"}:
             # Reused facts are announced so a discount is never applied silently.
             self._reused_quote = True
         return type(intent).model_validate(intent.model_dump() | changes)

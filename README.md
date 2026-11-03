@@ -152,7 +152,7 @@ Out-of-scope messages, greetings, thanks, goodbyes, and complaints use fixed Por
 
 A payment or freight quote for a product named in the message shows that product once; the search list is shown only when the name matches several products or the quote fails.
 
-Catalog searches also tolerate observed extraction errors. A product name combined with a wrong model-guessed category is retried by name only, and the response says the search was widened. When a category is given, a search term that does not appear in the current message (for example `viola` invented for “violões”) is dropped, while a typed term such as “violino” is kept. A price limit is applied only when its amount appears in the current message (`1000`, `1.000`, `1.000,50`, `1000.00`, `2 mil`, `mil`); otherwise the response states that the limit was not applied.
+Catalog searches also tolerate observed extraction errors. A product name combined with a wrong model-guessed category is retried by name only, and the response says the search was widened. When a category is given, a search term that does not appear in the current message (for example `viola` invented for “violões”) is dropped, while a typed term such as “violino” is kept. A price limit is applied only when its amount appears in the current message (`1000`, `1.000`, `1.000,50`, `1000.00`, `2 mil`, `mil`); otherwise the response states that the limit was not applied. A quote whose product reference consists only of payment words (for example `débito` or `no cartão`, invented from the payment method) is treated as naming no product, so the assistant asks for the product instead of reporting no match; in a clarification answer, the invented reference is dropped and the other answered facts are applied. Only PIX changes a price, so a model-supplied PIX is accepted only when the current message says `pix` with no negation or other payment term; any doubt asks the customer. Earlier quote facts are reused for the same product with a notice, unless the message mentions payment or names another product. Quantity is not yet checked against the message, and a request to “add” a product quotes it alone, as there is no basket.
 
 ## Order lookup (P09)
 
@@ -222,7 +222,7 @@ Python must be 3.13.x and pip must belong to the project environment. The comman
 
 Run from the repository root. Loader tests use small synthetic CSVs in temporary directories; demo tests additionally validate the bundled snapshot and default command. Neither needs the challenge download nor provider credentials. They cover normalization, historical totals, duplicate keys, orphan references, malformed data, optional fields, and the validation command's output and error behavior.
 
-On 2026-11-03, after PR #33, all 415 tests passed locally with Python 3.13.18 and pytest 9.2.0, and in CI on Windows, Linux, and macOS. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed.
+On 2026-11-03, on the list-reference branch, all 463 tests passed locally with Python 3.13.18 and pytest 9.2.0; CI on Windows, Linux, and macOS runs on each pull request. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed.
 
 ### Style and formatting
 
