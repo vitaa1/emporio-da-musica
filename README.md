@@ -1,304 +1,216 @@
 # Empório da Música
 
-## Architecture planning
+A text-based customer service agent for a fictional musical instrument store in Campo Grande/MS, built for the Artefact AI Engineer technical challenge. It runs as a Python CLI with a local model through Ollama. It answers in Portuguese about the catalog, prices, payment, freight, orders, returns, and store policies.
 
-The agent is a Python CLI with local LLM intent extraction (Ollama), a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results. Implemented: catalog search and prices, credit installments, local freight, session-scoped order lookup, return and exchange assessments, general policy answers, and out-of-scope, small-talk, and complaint messages. Live quality findings are documented in `docs/OLLAMA_EVALUATION.md`. Consolidated evaluation, interaction examples, and the final submission README remain (P13, P14).
+The main design decision is that **the model only interprets; Python decides**. The model proposes structured intents. Python validates them, controls access to orders, applies the business rules, and writes every price, stock fact, and order fact directly.
 
-- [Architecture, scope, and policy decisions](docs/ARCHITECTURE.md)
-- [Agent–controller contract](docs/CONTRACT.md)
-- [GitHub milestones and ready-to-copy issues](docs/GITHUB_PLAN.md)
-- [Project handoff and source analysis](CONTEXT.md)
+## Quick start
 
-These documents record the architecture, the P03 policy decisions and explicit deferrals (checked against the supplied manual), the implemented contracts, and the milestone plan. Model interpretation is evaluated separately from deterministic tests.
-
-## Package organization
-
-- `data/records.py`: typed records and the in-memory snapshot, without CSV parsing dependencies.
-- `data/loader.py`: CSV parsing, source validation, relationship checks, and index construction.
-- `providers/base.py`: provider-neutral request contracts, protocol, and errors.
-- `providers/extraction.py`: proposal validation and the single schema-repair attempt.
-- `providers/demo.py`: command-based demonstration adapter used for offline runs (`/buscar`, `/preco`, `/pedido`).
-- `providers/ollama.py`: local Ollama adapter (P08); see the Ollama section below.
-- `contracts/`: typed intents, results, dates, and session state.
-- `providers/policy.py` and `providers/prompts/`: policy-answer validation and the versioned extraction and policy prompts.
-- `controller.py`, `catalog.py`, `returns.py`, `composer.py`, and `cli.py`: orchestration, catalog/price/installment rules, return assessments, response rendering, and terminal interaction respectively.
-
-Imports target these modules explicitly; package initializers do not eagerly import adapters or loaders. The CLI owns demo usage guidance and constructs the provider. The controller depends on the provider protocol and extraction function. Domain/session code imports snapshot types from `data.records`, without importing the CSV loader.
-
-The package reorganization changes Python import paths: use `data.loader` for `load_snapshot`/`DataError`, `data.records` for record types, and `providers.base`/`providers.extraction` for the former provider module. `DemoProvider` belongs to `providers.demo`. Both documented CLI commands retain their behavior and paths.
-
-Tests separate controller behavior (`test_controller.py`), terminal interaction (`test_cli.py`), rendering (`test_composer.py`), and per-feature rules (`test_catalog.py`, `test_orders.py`, `test_policy.py`, `test_returns.py`, `test_shipping.py`). Shared synthetic setup is in `conftest.py` and conversation builders are in `support.py`. Existing assertions and parameterized cases are preserved; this refactor adds no runtime dependency or application capability.
-
-## Validate the supplied data (P04)
-
-After installing the development environment, run from the repository root:
+Requirements: Python 3.13 and, for natural-language mode, [Ollama](https://ollama.com/). No API key or paid service is needed.
 
 ```sh
-.venv/bin/python -m emporio_da_musica
+git clone https://github.com/vitaa1/emporio-da-musica.git
+cd emporio-da-musica
+python3.13 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
-The default is the bundled [demonstration snapshot](data/demo/README.md). No original download is needed. It preserves catalog and order scenarios from the challenge while replacing customer names, phones, emails, cities, order notes, and tracking codes with synthetic values. The linked document describes the exact transformations and limitations. This command validates data and prints counts; the separate offline CLI is described below.
+On Windows, create the environment with `py -3.13 -m venv .venv` and use `.\.venv\Scripts\python.exe` in the commands below. To install Python 3.13 with uv, see the [development guide](docs/DEVELOPMENT.md).
 
-To validate the original six CSVs instead, supply their directory:
+### Run with the local model
+
+```sh
+ollama pull qwen2.5:3b
+.venv/bin/python -m emporio_da_musica.cli --customer-id 3
+```
+
+Then try:
+
+```text
+Mostre violões Yamaha
+Quero duas unidades do segundo no PIX
+E em 10 vezes no crédito?
+Consulte meu pedido 1
+Qual o horário de sábado?
+```
+
+### Run without a model
+
+The offline mode uses explicit commands and does not interpret natural language. It is useful for checking the rules without Ollama:
+
+```sh
+.venv/bin/python -m emporio_da_musica.cli --demo --customer-id 3
+```
+
+```text
+/buscar Yamaha
+/preco 1 1 pix
+/pedido 1
+/sair
+```
+
+Other commands are listed when the session starts.
+
+## Configuration
+
+| Setting | Flag | Environment variable | Default |
+| --- | --- | --- | --- |
+| Ollama address | `--ollama-url` | `OLLAMA_BASE_URL` | `http://localhost:11434` |
+| Model | `--model` | `OLLAMA_MODEL` | `qwen2.5:3b` |
+| Socket timeout (seconds, maximum 600) | `--timeout` | | `120` |
+| Simulated customer for order lookup | `--customer-id` | | none |
+| Alternative CSV directory | `--data-dir` | | `data/demo/` |
+| Alternative manual (reviewed UTF-8 text) | `--manual` | | bundled manual |
+
+Flags override environment variables. `.env` files are not loaded automatically; `.env.example` lists the variables to export.
+
+When Ollama runs on Windows and the agent runs in WSL, use the Windows host address rather than `localhost`:
+
+```sh
+.venv/bin/python -m emporio_da_musica.cli --ollama-url "http://$(ip route | awk '/default/{print $3}'):11434"
+```
+
+Ollama must accept connections from WSL for this to work. Keep the server restricted to the intended machine or network.
+
+## Data
+
+The application uses `data/demo/` by default. It keeps the challenge's catalog and order scenarios but replaces customer names, contacts, cities, order notes, and tracking codes with synthetic values, because customer data has no reason to be in a public repository. [The demo README](data/demo/README.md) describes the transformations.
+
+To validate a directory holding the original six CSVs (this prints table counts only):
 
 ```sh
 .venv/bin/python -m emporio_da_musica /path/to/challenge/data
 ```
 
-On Windows, use `.\.venv\Scripts\python.exe`. On WSL, a Windows directory is accessible under `/mnt/c/`; quote paths containing spaces. Original files can stay outside the repository or in ignored `data/source/`. Only `data/demo/` is intended for version control. The loader does not modify either dataset. The PDF is not needed by this command.
-
-Required filenames are `desafio_tecnico_ai_eng - categories.csv`, `desafio_tecnico_ai_eng - products.csv`, `desafio_tecnico_ai_eng - customers.csv`, `desafio_tecnico_ai_eng - orders.csv`, `desafio_tecnico_ai_eng - order_items.csv`, and `desafio_tecnico_ai_eng - promotions.csv`. All must have their supplied header and UTF-8 encoding (an optional BOM is accepted). Column order may vary; missing, duplicate, or additional columns are rejected. Surrounding field whitespace is removed; blank required values and malformed records fail the whole load.
-
-The command prints only table counts on success and exits with status 1 on data errors. The supplied snapshot produces 9 categories, 65 products, 50 customers, 20 orders, 22 order items, and 25 promotions. Counts are audit evidence, not hardcoded validation constraints.
-
-`emporio_da_musica.data.loader.load_snapshot(path)` returns typed records indexed by primary ID (order items by order/product pair), plus products by category, orders by customer, items by order, and promotions by product. IDs and item quantities must be positive integers; stock and amounts may be zero. Amounts use `Decimal`, with at most two decimal places for currency. Percentages are between 0 and 100. Dates must be valid `YYYY-MM-DD` dates. Product specs must be JSON objects; duplicate keys and nonfinite numbers are rejected. Promotion flags accept only `0` and `1`. Only order tracking, estimated delivery, and notes may be blank, becoming `None`.
-
-Known product/order statuses are validated. Historical payment methods preserve `pix`, `debit`, `boleto`, or `credit_1x` through `credit_12x`; loading a recorded payment does not approve current payment conditions. Historical totals are never recomputed. Discontinued/coming-soon stock, empty categories, and inactive promotions remain available as source facts. No stock availability, policy eligibility, or actual receipt is inferred.
-
-The loader validates all foreign keys and duplicate keys before returning a snapshot. Errors identify table, CSV line when available, and field without including source values. Customer and order records are excluded from generated representations. Indexes are internal application data, not an authorization boundary; future order access must enforce the simulated session in Python. The snapshot is mutable in memory and must be treated as read-only by consumers. It is not live inventory or a carrier connection.
-
-## Typed agent/controller contracts
-
-`emporio_da_musica/contracts/` defines strict Pydantic intents, results, clarification updates, and session state. `emporio_da_musica/providers/` supplies a provider-independent extraction boundary tested with a fake provider. It does not call an LLM or execute business operations yet. See [the contract](docs/CONTRACT.md#implemented-interfaces-and-limits) for payload examples, five-intent limits, missing-quantity behavior, store date handling, and the separation between model proposals and Python-owned identity/prices.
-
-Pydantic validates structure and tzdata supplies the store timezone on all supported platforms. Runtime-only setup uses `.venv/bin/python -m pip install -r requirements.txt`; development setup uses `requirements-dev.txt`, which includes runtime dependencies and pytest/Ruff/pip-tools. No provider credentials are required for the contract tests.
-
-## Catalog search and prices
-
-`emporio_da_musica.catalog.search_catalog(snapshot, ProductSearch(...))` returns a typed result without calling a provider. Search uses case/accent-insensitive substring matching on product names and, separately, category names; repeated whitespace is collapsed and punctuation retained. Both filters must match. No synonyms or fuzzy matching are inferred.
-
-Results are sorted by ascending product ID and limited to ten (raised from five after manual testing showed brand searches such as Yamaha acoustic guitars being truncated). `CatalogData.total_matches` reports the count before truncation: zero matches return `not_found`, while multiple matches return choices without selecting a product. The future controller must save the actual displayed order for ordinal references. An empty search browses the catalog; empty categories have no results.
-
-Availability requires active status and sufficient stock for the requested quantity. Discontinued and coming-soon statuses override positive stock. Only `available_only=True` filters unavailable products. Missing quantity is treated as a unit-price inquiry with an explicit assumption; this default must not be reused for basket assessments.
-
-Active promotions override the 5% PIX discount (manual §§3, 6), including an active 0% promotion. Inactive promotions are ignored. Multiple active promotions on a matching product require confirmation because precedence is undefined. Prices use Decimal and ROUND_HALF_UP to cents per unit, then multiply by quantity. This rounding convention is a prototype assumption. The budget is inclusive and compares the resulting quantity total, using the requested payment method, before result truncation. Unspecified payment uses list/promotional price with an explicit assumption and no PIX discount.
-
-Combined payment requires confirmation. Installments without a method or with a noncredit method request corrected conditions. Credit requests for 2–3 installments return `requires_confirmation` because the policy is ambiguous. Requests for 4–6 installments require at least BRL 80 per installment and 7–12 at least BRL 100 (§3.1), compared against the quote total for the requested quantity after any promotion (credit has no PIX discount). Installments are split in whole cents, with any remainder in the first installment. A count below the minimum is not offered and the response notes the minimum; credit without a count reports the largest eligible count from 4 to 12. No interest is applied, as the manual states. Quotes for unavailable products are informational snapshot prices, not offers or reservations. The separate offline CLI now exposes catalog execution; live provider integration remains subsequent work.
-
-## Local model with Ollama (P08)
-
-Start Ollama with `qwen2.5:3b` installed, then run:
-
-```sh
-export OLLAMA_BASE_URL=http://localhost:11434
-export OLLAMA_MODEL=qwen2.5:3b
-.venv/bin/python -m emporio_da_musica.cli
-```
-
-For Windows-hosted Ollama accessed from WSL, use its reachable Windows address instead of localhost. In the current development session, `http://172.21.64.1:11434` was reachable; that address is machine-specific and may change. `--ollama-url` and `--model` override environment variables. `.env.example` documents nonsecret values; files named `.env` are not loaded automatically. No API key or paid API is used. Keep access to the local server restricted to the intended machine/network.
-
-Type natural language, for example “Mostre violões Yamaha”, then “Quero uma unidade do segundo no PIX”. The `--demo` option retains command-based offline behavior. Catalog lookup, supported price calculations, and session-scoped order lookup execute in Python. General policy questions, out-of-scope messages, small talk, and complaints are answered as described in Policy answers and service messages below; return assessments are described in Return assessments below; freight quotes are described in Local freight below.
-
-The official extraction prompt is versioned in `emporio_da_musica/providers/prompts/extraction.md`. It defines the persona, schema vocabulary, trust boundary, missing-fact handling, references, corrections, four behavioral examples, and three contextual-reference examples. The full manual precedes these instructions. This extraction call returns intents only; general-policy prose remains a separate planned route and cannot rewrite operational results.
-
-The adapter uses the standard library with `/api/chat`, a Pydantic-derived JSON schema, nonstreaming output, temperature zero, a 16,384-token context setting, and a 2,048-token generation limit. Only full-turn proposals are permitted when no pending operation exists. History is additionally bounded to the most recent complete messages totaling 8,000 characters. The full reviewed manual text (eight source pages) is bundled as `providers/store_manual.txt`; `--manual` accepts a reviewed UTF-8 replacement limited to 40,000 characters. This is context for extraction, not authorization to execute the manual's services or publish conflicting contacts.
-
-Requests are capped at 180,000 serialized bytes and responses at 256,000 transport bytes / 32,000 extracted-content bytes. The default socket timeout is 120 seconds (`--timeout`, maximum 600); this is a socket-operation timeout, not a total wall-clock deadline. There are no transport retries. The existing extraction boundary permits one schema-repair call, at most two requests per turn. Redirects and environment HTTP proxies are disabled. Errors, incomplete output, and exhausted generation produce a sanitized failure without fallback prices. Source statements and JSON validity do not prove correct interpretation.
-
-Opt-in live smoke evaluation (not collected by pytest or CI):
-
-```sh
-.venv/bin/python -m evals.ollama --url http://localhost:11434 --model qwen2.5:3b
-```
-
-This uses bundled demonstration records and reports per-case status and latency. With the contextual-reference examples, the latest Qwen run passed all three smoke steps, including PIX totals and quantity correction. Gemma passed search but quoted the wrong product on the second step; its correction step was not executed. Earlier search and quote requests succeeded, while quantity corrections failed semantic checks. The model is configurable; 3B was selected for local operation and modest download size, not a demonstrated quality advantage over alternatives. The same-prompt comparison supports retaining Qwen for this development flow; it does not establish general model superiority. See the recorded live findings in `docs/OLLAMA_EVALUATION.md`.
-
-## Offline catalog conversation (issue #10)
-
-Run the command-based demonstration without credentials:
-
-```sh
-.venv/bin/python -m emporio_da_musica.cli --demo
-```
-
-Use `--data-dir /path/to/csvs` to select another validated snapshot. The original `python -m emporio_da_musica` count-only validation command is unchanged. Windows uses `.\.venv\Scripts\python.exe`.
-
-Example inputs, executed against the bundled demo during local tests:
+## Architecture
 
 ```text
-/buscar Yamaha
-/preco 1 1 pix
-/sair
+Customer message
+      │
+      ▼
+Local model ── proposes intents as JSON
+      │
+      ▼
+Pydantic ───── validates the structure (one repair attempt)
+      │
+      ▼
+Controller ─── resolves references, checks evidence and access
+      │
+      ▼
+Business rules and in-memory CSV queries
+      │
+      ▼
+Python composer ── writes prices, stock, orders, errors, and clarifications
 ```
 
-`/buscar` with no query lists the first ten products. `/preco POSITION QUANTITY METHOD` uses the numbered list from the last response; methods are `pix`, `debit`, `credit`, and `boleto`. `/escolher POSITION`, `/quantidade NUMBER`, and `/pagamento METHOD` answer the first pending clarification when that field was requested. `/cancelar` discards unfinished queries, `/ajuda` shows commands, and `/sair`, EOF, or Ctrl+C ends the session. Commands with missing or invalid arguments show usage examples without invoking extraction. Clarification commands without pending work explain how to start a price query; unrequested fields leave pending work unchanged. The demo provider recognizes these explicit commands only; it is not a language model or a natural-language interpreter.
+General policy questions take a separate route: a second model call receives the manual and only the customer's current question. Its answer is validated before display and is shown with its manual sections.
 
-`Controller(snapshot, provider, clock=...)` accepts any provider implementing the existing extraction protocol. `handle(message)` returns deterministic Portuguese text and typed operation results. It validates the complete proposal before dispatch, permits one schema repair, and executes supported catalog/payment-price requests in source order. Payment requests reuse the catalog's supported price rules, require an explicit quantity/payment method, and apply the §3.1 installment bands described above. Order status requests run only for the startup-selected simulated customer (see Order lookup below). Policy questions use a separate model call; out-of-scope, small-talk, and complaint messages use fixed templates. Return assessments and local freight quotes run in Python (see their sections below).
+| What | Where |
+| --- | --- |
+| Intents and results | `emporio_da_musica/contracts/` |
+| CSV loading and validation | `emporio_da_musica/data/` |
+| Model adapters, prompts, and policy validation | `emporio_da_musica/providers/` |
+| Orchestration | `emporio_da_musica/controller.py` |
+| Catalog and payment rules | `emporio_da_musica/catalog.py` |
+| Return assessments | `emporio_da_musica/returns.py` |
+| Response templates | `emporio_da_musica/composer.py` |
+| Terminal interface | `emporio_da_musica/cli.py` |
 
-Selections resolve in Python: an ordinal refers to the actual list shown before the current turn; `selected` may use a preceding unique successful lookup. Search results and successful product quotes in a response share one numbering sequence in first-display order (at most 50 distinct products). Ambiguous, failed, or unsuccessful reference resolution clears the current selection. Exact resolved IDs are quoted without another name search, including when names are duplicated. Each successful quote participates in the displayed list, preserving its selection when an independent search also runs. A quote-only response lists the quoted products; subsequent ordinals refer to that updated list.
+## Technical decisions
 
-Missing facts create at most five pending operations. A scoped clarification updates and revalidates only its target; resolved product IDs remain pinned while quantity/payment facts are collected. An unresolved product still requires an explicit reference update even if an independent lookup selected another product. Other pending operations remain suspended until their own clarification; no dependency graph or automatic retry is inferred. A new complete intent turn replaces earlier pending work; `/cancelar` explicitly cancels it. Corrections to already completed requests are new turns and recompute prices. The response shows successes first, limitations next, and one focused clarification last.
+| Decision | Why | Trade-off |
+| --- | --- | --- |
+| Python owns prices, rules, and authorization | A wrong price or a leaked order is the costliest failure, and live testing showed the 3B model producing valid JSON with wrong meaning | Responses are less natural, and every new rule needs code |
+| Model output is intents, not free text, for operational answers | Critical facts cannot be rewritten or invented by the model | Requires a schema and a controller for each operation |
+| Local Ollama with `qwen2.5:3b` | No cost or credentials, and customer messages stay local. It passed the same-prompt smoke test where Gemma failed on one step | A small sample, not proof of general superiority; a small model needs more guards |
+| No agent framework | One agent with sequential operations is simple enough for a direct controller | Retries and tool loops would have to be written if the scope grew |
+| CSVs in memory, no database or vector store | The data is small and read-only; the full manual fits in the model context | Does not scale to a large catalog or manual, and has no live stock |
+| Session-only history | The challenge does not require persistence | Conversations are lost when the CLI closes |
+| `--customer-id` set outside the model | The model and the message text cannot change whose orders are visible | Demonstrates authorization, not real authentication |
+| `Decimal` for all money | Avoids floating-point errors at policy thresholds | None significant |
+| Ask for confirmation when the manual is ambiguous | The challenge allows documented assumptions, and an invented commitment is worse than a clarification | Some answers defer to the store |
 
-Input is limited to 4,000 characters; the CLI drains an oversized line without interpreting its remainder. History retains at most 20 messages in memory. Full operational output is displayed, but responses exceeding the history field limit are represented by a fixed summary in history. Provider requests contain the ordered displayed names and pending hints, never customer tables or session identity. Logs include only operation/error class identifiers; expected arithmetic, record-lookup, and validation failures cannot produce fallback prices. Unexpected programming errors are not silently swallowed. Product text is rendered without terminal control characters. No persistent session, paid API, dependency, or transaction capability is added.
+### Prompt and retrieval strategy
 
-## Prototype policy assumptions
+- **Persona:** the versioned [extraction](emporio_da_musica/providers/prompts/extraction.md) and [policy](emporio_da_musica/providers/prompts/policy.md) prompts set an informal, professional, welcoming store tone, as the manual asks. Fixed Python templates follow the same tone.
+- **Data versus policy:** the model classifies each request into a typed intent. Data intents run Python queries, and policy questions go to the manual route, so the model never answers a price or order from memory.
+- **Extraction prompt:** it defines the schema vocabulary, the trust boundary, how to handle missing facts, and a few behavioral examples. Temperature is zero and output is constrained by a JSON schema derived from Pydantic.
+- **Guards in code:** a prompt instruction is not a guarantee, so important rules are also enforced in Python. For example, payment methods, budgets, and order numbers must appear in the current message.
+- **Retrieval:** there are no embeddings. The whole eight-page manual is sent as context, which is simpler and cannot miss a section at this size. Function-calling loops were also avoided: a single validated proposal per turn is easier to test with a small model.
 
-The challenge permits reasonable documented interpretations. For implementation, prefer the detailed installment bands over the payment summary; defer the ambiguous 2–3 installment band and combined-payment calculations for confirmation. Initially support local freight only for a declared Campo Grande/MS destination, using item totals after applicable discounts and before freight; exactly BRL 500 requires confirmation. Other metropolitan destinations, the preference-exchange starting event, and conflicting contact details also require confirmation. These decisions and their source references are detailed in [architecture](docs/ARCHITECTURE.md#policy-decisions-for-implementation-p03--issue-4).
+### Policy assumptions
 
-## Policy answers and service messages (P12)
+The manual is ambiguous or incomplete in several places. The prototype handles them like this:
 
-General policy questions (hours, address, payment methods, exchanges, warranty, delivery) use a second Ollama call with the full manual and `providers/prompts/policy.md`. Only text from the customer's current message is sent (the model-isolated question when it appears literally in that message); no history, identity, or order data. The model returns JSON with `covered`, `answer`, and manual section references, validated in Python against the known sections. The answer is displayed with its sections and a footer stating that it is a general explanation, not an individual approval. If the model reports an explicit store-address question (“Qual o endereço da loja?”, “Onde fica a loja?”) as uncovered or fails, the address is shown from fixed manual §1.2 text; the fallback applies only when the whole question is about the store address, so mixed questions, delivery addresses, and order locations keep their normal outcome. Contact requests keep the conflicting-contact message.
+- **Installments:** the detailed §3.1 bands take precedence over the summary table: 4–6x requires at least BRL 80 per installment, and 7–12x at least BRL 100. The 2–3x band and combined payments require confirmation.
+- **Rounding:** PIX and promotional unit prices round half-up to cents. Any installment remainder goes in the first installment.
+- **Freight:** only Campo Grande/MS is quoted, because the manual does not list the metropolitan municipalities. Exactly BRL 500 requires confirmation, because the manual covers only above and below that value.
+- **Preference exchange:** the deadline's starting event is not stated, so the case is reported for store review.
+- **Contacts:** the manual gives conflicting phone numbers and emails, so the agent states the conflict and gives the store address.
 
-Python enforces these limits rather than relying on the prompt:
+[The architecture document](docs/ARCHITECTURE.md#policy-decisions-for-implementation-p03--issue-4) has the source references.
 
-- `covered: false` (unrelated or unsupported questions) shows the fixed out-of-scope message instead of model prose.
-- Contact requests (telefone, WhatsApp, e-mail, contato) are answered without the model, and answers containing contact details (eight or more digits after removing separators, `@`, `arroba`, `ponto com`, `www`, `http`, `wa.me`, `.com`, or the joined store domain) are discarded: the manual lists conflicting contacts, so a fixed message states the conflict and gives the store address.
-- Every number in an answer must appear in the manual, so invented prices, discounts, or deadlines are rejected; answers claiming an executed action (registered, approved, refunded, cancelled, forwarded, transferred) are rejected; answers are limited to 1,000 characters.
-- Malformed answers, unknown sections, or provider failures show a fixed limitation, never partial prose.
-- These guards reduce prompt-injection risk but cannot prove grounding: a spelled-out number or a misstated rule using manual numbers can still pass.
-- The command-based demo has no policy model and reports the route as unavailable.
+## Examples
 
-Out-of-scope messages, greetings, thanks, goodbyes, and complaints use fixed Portuguese templates in `composer.py`. Python picks the out-of-scope template from the model's topic (or the current message when it is a single request without a topic): accessory requests (strings, cables, picks, effect pedals, amplifiers, cases, covers; ambiguous words such as “7 cordas”, “cordas orquestrais”, “Cabo Frio”, or “pedal de bateria” are not counted) state that the store sells only instruments and does not recommend other stores; unrelated topics (for example, general knowledge) list what the assistant can help with instead of mentioning accessories. Individual cases (returns, freight, installments) are routed to Python assessments; the policy model only explains general rules and is instructed not to decide individual cases. Complaint replies acknowledge the customer and state that nothing was registered or forwarded. When a validated policy answer cites only warranty sections (§§8–8.3), Python replaces the prose with a reviewed summary of §§8.1–8.3: the 90-day period starts at receipt, manufacturer-specific coverage depends on the certificate, and exclusions remain explicit. This prevents the observed mix-up with privacy law. Answers citing warranty together with other sections still use validated model prose so independent questions are not discarded. Semantic correctness of that remaining prose is not proven by these checks; it is evaluated in `docs/OLLAMA_EVALUATION.md`.
+[Five recorded conversations](docs/EXAMPLE_CONVERSATIONS.md) show real, verbatim model runs: catalog references with quantity and payment changes, installments with freight, order access with an injection attempt, grounded policy answers, and a promotion that does not stack with PIX.
 
-A payment or freight quote for a product named in the message shows that product once; the search list is shown only when the name matches several products or the quote fails.
-
-Catalog searches also tolerate observed extraction errors. A product name combined with a wrong model-guessed category is retried by name only, and the response says the search was widened. When a category is given, a search term that does not appear in the current message (for example `viola` invented for “violões”) is dropped, while a typed term such as “violino” is kept. A price limit is applied only when its amount appears in the current message (`1000`, `1.000`, `1.000,50`, `1000.00`, `2 mil`, `mil`); otherwise the response states that the limit was not applied. A quote whose product reference consists only of payment words (for example `débito` or `no cartão`, invented from the payment method) is treated as naming no product, so the assistant asks for the product instead of reporting no match; in a clarification answer, the invented reference is dropped and the other answered facts are applied. Model-supplied payment methods require evidence in the current message; ambiguous negations ask for clarification. PIX additionally requires no other payment term because it changes the price. Python never selects a payment method from a keyword. Earlier quote facts are reused for the same product with a notice; a payment mention prevents reusing the method, while a recognized payment-only follow-up (such as “e em 10 vezes no crédito?”) retains the earlier quantity even if the model supplies a default of one. Explicit quantity changes and different products keep their own facts. Quantity is not generally validated against arbitrary wording, and a request to “add” a product quotes it alone, as there is no basket.
-
-## Order lookup (P09)
-
-Start either CLI mode with `--customer-id N` to select a simulated customer from the loaded snapshot, for example:
-
-```sh
-.venv/bin/python -m emporio_da_musica.cli --demo --customer-id 1
-```
-
-Then use `/pedido 4` in demo mode, or ask in natural language (“Qual o status do meu pedido 4?”). An unknown ID fails startup. The identity is fixed for the session, shown in the banner as a demonstration, and never sent to the model; it is not authentication. Without it, order requests return a fixed message and no record is consulted.
-
-## Local freight (P10)
-
-Freight quotes need the product, quantity, payment method, and a declared destination city, because the BRL 500 threshold (§5.1) is compared with the item subtotal after promotion or PIX discount, before freight. Only Campo Grande/MS (or Campo Grande without a state, labeled as an assumption) is supported: above BRL 500 is free, below costs BRL 35, and exactly BRL 500 requires store confirmation. The manual does not list the metropolitan municipalities, and outside-region prices depend on postal code, weight, and dimensions without a carrier integration, so other cities return a confirmation message with the manual's general transit ranges. A postal code alone never establishes the region, and the customer's recorded city is not used. Unavailable products get no freight, and a failed quote is reported before the destination is requested. Campo Grande without a state but with a postal code outside MS (not 79xxx) requires confirmation. The 1–3 business-day local estimate is labeled as an estimate, never a delivery date.
-
-## Return assessments (P11)
-
-A customer's own return or exchange case (for example, “Me arrependi da minha compra, posso devolver meu pedido?”) is assessed in Python against manual §§4.1–4.4; general questions about the return policy remain policy answers. The assistant asks only for the facts the reason needs: withdrawal needs purchase channel, receipt date, and product condition; defect needs the order number (its 30-day window starts at the recorded order date, so a simulated customer session is required); preference needs the product condition. The response lists each condition as satisfied, not satisfied, not informed, or requiring store review, labeled as a customer declaration, order record, or manual rule. A delivery estimate never counts as receipt, a declared defect always needs store inspection, and the preference window is reported for review because the manual does not state its starting event. No return, exchange, or refund is requested, approved, or performed. See `docs/CONTRACT.md` for the full rules.
-
-Only orders of the session customer are rendered: status, recorded historical total (never recomputed from the current catalog), tracking code when recorded, and the estimated delivery explicitly labeled as an estimate that does not confirm receipt. Missing tracking or estimates are stated as not recorded. Foreign and nonexistent order numbers produce the same response. A request without a number asks for it, or reuses the order shown successfully in the previous lookup. An order number is accepted only when its ASCII digits appear in the current message outside money amounts (such as `R$ 4,00`), so a number copied by the model from history is discarded; numbers written only in words therefore lead to a request for the digits. When the customer typed a number that was not extracted, the order in focus is never used as a substitute. This filter improves extraction quality; access control is the Python ownership check. Rendered order facts (status, recorded total, tracking code, estimate) enter the bounded session history sent to the local model. Items, payment method, customer details, and notes are not displayed. Data is the historical snapshot, not a carrier integration.
-
-Date calculations will use an injected clock in `America/Campo_Grande`, with the starting date as day zero and the final calendar day included. Missing holiday data prevents exact business-day deadlines. These are prototype boundaries, not implemented features, production authentication, or authorization to perform refunds or other transactions.
-
-## Complete-agent evaluation
-
-The opt-in [evaluation suite](evals/README.md) covers 12 scenarios and records real
-responses, structured outcomes, configuration, and timing. See the
-[2026-11-03 findings](docs/AGENT_EVALUATION.md) and
-[five actual conversations](docs/EXAMPLE_CONVERSATIONS.md). The report preserves
-the initial failures, review corrections, and subsequent verification. Automated
-structural success is not proof of factual correctness.
-
-## Development environment
-
-Use Python 3.13 with a project-local virtual environment. Development and dependency generation use Linux/WSL (Ubuntu); CI also checks installation on Windows and macOS. Keep Windows and Linux environments separate.
-
-### Install Python and dependencies
-
-If Python 3.13 is unavailable, install it with [uv](https://docs.astral.sh/uv/getting-started/installation/):
+## Testing and evaluation
 
 ```sh
-curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh
-sh /tmp/uv-install.sh
-~/.local/bin/uv python install 3.13
-~/.local/bin/python3.13 --version
-```
-
-From the repository root, create `.venv` only if it does not exist, then install the pinned dependencies:
-
-```sh
-python3.13 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
-```
-
-If the interpreter is not on PATH, use `~/.local/bin/python3.13`. Activation is optional: use explicit `.venv/bin/python` paths. On Windows, create a separate environment with `py -3.13 -m venv .venv` and use `.\.venv\Scripts\python.exe` for subsequent commands.
-
-### Verify the environment
-
-```sh
-.venv/bin/python --version
-.venv/bin/python -m pip --version
-.venv/bin/python -m pip check
-.venv/bin/python -m piptools compile --version
-.venv/bin/python -m ruff --version
+.venv/bin/python -m pytest -q
 .venv/bin/python -m ruff check .
 .venv/bin/python -m ruff format --check .
 ```
 
-Python must be 3.13.x and pip must belong to the project environment. The commands above validate tooling and Python style. Data-loader validation is described above.
+The 489 deterministic tests need no model or credentials. They run in CI on Linux, Windows, and macOS.
 
-### Run deterministic tests
+On 2026-11-03, a clean copy of this documentation's working tree was verified on WSL2 with Python 3.13 in a new virtual environment: installing the pins, the data validation, the offline commands, and the model example under Quick start all worked, as did the checks above. A single example run does not guarantee identical model output later.
 
-```sh
-.venv/bin/python -m pytest -q
-```
-
-Run from the repository root. Loader tests use small synthetic CSVs in temporary directories; demo tests additionally validate the bundled snapshot and default command. Neither needs the challenge download nor provider credentials. They cover normalization, historical totals, duplicate keys, orphan references, malformed data, optional fields, and the validation command's output and error behavior.
-
-On 2026-11-03, on the list-reference branch, all 463 tests passed locally with Python 3.13.18 and pytest 9.2.0; CI on Windows, Linux, and macOS runs on each pull request. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed.
-
-### Style and formatting
-
-`.editorconfig` defines UTF-8, LF endings, a final newline, four-space indentation, and two spaces for YAML/JSON. Markdown preserves trailing spaces used for line breaks. Use an editor with EditorConfig support; no editor-specific configuration is required.
-
-Ruff configuration lives in `pyproject.toml`: Python 3.13, 88-column formatting, double quotes, basic error checks (`E4`, `E7`, `E9`, `F`), and import sorting (`I`). Local agent tooling and environment backups are excluded. See the [Ruff configuration reference](https://docs.astral.sh/ruff/configuration/).
-
-To apply formatting and safe lint fixes, then review the diff:
+Model behavior is evaluated separately, because it depends on a local server and is not deterministic:
 
 ```sh
-.venv/bin/python -m ruff check --fix .
-.venv/bin/python -m ruff format .
+.venv/bin/python -m evals.suite --url http://localhost:11434 --output /tmp/emporio-evaluation.json
 ```
 
-### Optional VS Code workflow
+The latest recorded run passed 29 of 29 turns across 12 scenarios. The cases were informed by development, so this is a regression check rather than an independent accuracy measure. [The evaluation report](docs/AGENT_EVALUATION.md) keeps the earlier failing runs and their corrections, including one provider error whose cause was not determined.
 
-Open the repository from a WSL terminal with `code .` when VS Code's [WSL support](https://code.visualstudio.com/docs/remote/wsl) is installed. Confirm the window is connected to WSL, then use **Python: Select Interpreter** to choose the project's `.venv/bin/python`; see [Python environments](https://code.visualstudio.com/docs/python/environments). Do not select a Windows interpreter for this checkout.
+## Known limitations
 
-EditorConfig support and the Ruff extension are optional conveniences. The terminal commands above remain the source of truth. No `.vscode` files or machine-specific interpreter paths are required or committed.
+- **Interpretation errors remain possible.** Quantity is not checked against arbitrary wording, generic "cartão" depends on the model, and negations may trigger an extra clarification.
+- **Policy prose is not proven correct.** Validators reject invented numbers, unknown sections, and claims of executed actions, but a misstated rule using valid numbers can pass. Only warranty-only answers use a fixed reviewed summary.
+- **No transactions.** There is no basket, purchase, refund, or human handoff. "Adicione" quotes only the named product, and complaints are acknowledged with a clear statement that nothing was registered.
+- **No live data.** Stock and orders come from a snapshot, and there is no carrier integration. Freight outside Campo Grande is not quoted.
+- **No real authentication.** The customer identity is simulated.
+- **Dates are limited.** The model does not know today's date; Python resolves only supported relative dates such as "hoje" and "ontem". Holidays are unknown, so exact business-day deadlines are not calculated.
+- **The evaluation is small.** It gives no stability guarantee between runs, and token use and model digest were not recorded.
 
-### Generate dependencies
+## Possible improvements
 
-`pyproject.toml` declares direct dependencies; `requirements.txt` pins runtime dependencies and `requirements-dev.txt` pins runtime plus development dependencies and their transitive dependencies. Generate both outputs together whenever declarations change.
+1. Grow the evaluation with held-out cases and repeated runs, then use it to compare larger models.
+2. Add a real complaint and human handoff channel.
+3. Connect live stock, a carrier, and real customer authentication.
+4. Add a basket, so that "adicione" and multi-item freight work.
+5. Retrieve manual sections by topic if the manual outgrows the model context.
+6. Get store answers to the open policy questions and remove the matching confirmations.
 
-Linux/WSL with Python 3.13 is now the generation reference, replacing Windows to match the development environment. The Linux CI job regenerates both files and checks for differences; all three platforms still install it and run setup checks. `colorama` is explicitly declared to retain the existing Windows dependency of `build` in this shared file. Review platform-specific dependencies whenever adding tools; a Linux-generated file alone does not guarantee compatibility elsewhere.
+## Use of coding assistants
 
-Generate in the reference environment using the installed pinned pip-tools, without manually editing the output:
+I used two assistants, and they wrote most of the code and documentation:
 
-```sh
-CUSTOM_COMPILE_COMMAND='pip-compile --allow-unsafe --output-file=requirements.txt --strip-extras pyproject.toml' .venv/bin/python -m piptools compile --allow-unsafe --strip-extras --output-file=requirements.txt pyproject.toml
-CUSTOM_COMPILE_COMMAND='pip-compile --allow-unsafe --extra=dev --output-file=requirements-dev.txt --strip-extras pyproject.toml' .venv/bin/python -m piptools compile --extra=dev --allow-unsafe --strip-extras --output-file=requirements-dev.txt pyproject.toml
-.venv/bin/python -m pip install -r requirements-dev.txt
-.venv/bin/python -m pip check
-```
+- **Codex CLI** did most of the development: requirements and source analysis, planning, architecture and contract drafts, implementation, and tests.
+- **Claude Code** was used mainly for reviews and for adjusting the last implementations, and it also drafted this README.
 
-Review and commit declarations and generated pins together. Do not use `--upgrade` unless deliberately updating existing dependencies. Windows/macOS contributors should use Linux/WSL for generation.
+**My part.** The architecture and the scope are my decisions: the CLI → model → Python controller flow, Python-owned business rules, few-shot prompting, explicit guardrails, and problem decomposition. I reviewed and manually tested the work throughout, and I merged every pull request. I did not read every diff line by line, so I also relied on automated tests, CI, and review passes to check the code.
 
-### Recreate the environment
+**Workflow.** The assistants worked on one issue and branch at a time: plan from `docs/`, implement with offline tests, run the real model, review, fix confirmed findings, then update the documentation. The reviewer roles and skills used are versioned in `.codex/agents/` and `.agents/skills/`, and `AGENTS.md` holds the working rules.
 
-Stop processes using `.venv` and deactivate it if active. On Linux/WSL, rename it to an unused backup name:
+Running the real model changed the design. The small model often returned valid JSON with the wrong meaning, such as order numbers copied from history, so those cases became checks in Python. The failures are preserved in [the Ollama evaluation](docs/OLLAMA_EVALUATION.md) and [the agent evaluation](docs/AGENT_EVALUATION.md).
 
-```sh
-mv -T -n .venv .venv-backup
-```
+## Further documentation
 
-Confirm `.venv` no longer exists before creating and installing again. Remove the backup after validating the new environment. Never commit environments or backups.
-
-### Continuous integration
-
-Pull requests targeting `main` and pushes to `main` run `setup-python-windows`, `setup-python-linux`, and `setup-python-macos`. Each creates a fresh Python 3.13 environment, installs the pins, runs `pip check`, verifies pip-tools, checks Ruff lint and formatting, and runs `python -m pytest -q`. Only Linux regenerates dependencies and compares the result with the committed file.
-
-Keep all three checks required before merge. No provider credentials are needed. New workflow changes still require a remote CI run before their cross-platform results can be claimed.
-
-### Local configuration
-
-Virtual environments, backups, Python/Ruff/pytest caches, local source snapshots outside `data/demo/`, and `.env` files are ignored. Commit `.env.example` only with nonsecret example values.
-
-## Contributor workflow
-
-Create a dedicated issue branch before changing files; never develop directly on `main`. Keep each PR focused, link its issue, and describe the change, verification, and remaining limitations. Use `docs:`, `chore:`, or `ci:` commit prefixes as appropriate. Review generated pins together with their declarations and require all three CI checks before merge.
-
-See [AGENTS.md](AGENTS.md) for repository conventions. Development skills under `.agents/skills/` and `skills-lock.json` are versioned for a shared workflow. They are optional for running the application; see their [source and license](.agents/skills/README.md). The optional [development reviewers](.codex/agents/README.md) are versioned with the repository.
-
-## Setup verification
-
-On 2026-11-02, setup was verified on Ubuntu 24.04.1 under WSL2 with Python 3.13.18. A clean export of commit `74eb53c` was placed in a temporary directory, a new `.venv` was created, and `requirements-dev.txt` was installed without reusing the project's environment.
-
-The commands under **Verify the environment** passed: pip 26.2.2 belonged to the temporary environment, `pip check` reported no broken requirements, pip-tools was 7.6.2, and Ruff was 0.17.3. Regenerating the pins produced a byte-identical file. Ruff found no lint violations; formatting reported one file already formatted. At the time of that setup verification, no application Python code existed.
-
-The [CI run for the merged tooling change](https://github.com/vitaa1/emporio-da-musica/actions/runs/41445792754) passed all three platform checks. Windows/macOS verification used hosted runners, not local manual execution. Interpreter installation from scratch, VS Code integration, and application behavior were not tested in this validation. Setup requires an available Python 3.13 interpreter and access to the package index (or suitable cached packages); no LLM credentials are required.
+- [Architecture and policy decisions](docs/ARCHITECTURE.md)
+- [Agent–controller contract](docs/CONTRACT.md)
+- [Detailed behavior reference](docs/BEHAVIOR.md)
+- [Development guide](docs/DEVELOPMENT.md)
+- [Project plan](docs/GITHUB_PLAN.md) and [handoff history](CONTEXT.md)

@@ -1,6 +1,6 @@
 # GitHub Milestones and Issues
 
-Ready-to-copy planning draft, 2026-11-02. The user will create/update milestones and issues manually. Some entries have since been registered on GitHub: setup is issue #1 (closed), P01 is #5 (closed after PR #6), P02 is #3 (closed after PR #13), and P03 is #4, P08 is #11 (closed after PR #26), P09 is #12 (closed after PR #28), P10 is #18 (closed after PR #32), P11 is #19 (closed after PR #30), P12 is #20 (closed after PRs #29 and #33), P13 is #21, and P14 is #22. Recheck remote status before further updates. Labels and `P01`–`P14` are local planning suggestions, not actual GitHub issue numbers. Existing issue numbers/statuses must be checked before registering duplicates. Dates are intentionally unset until the recruitment deadline is known.
+Ready-to-copy planning draft, 2026-11-02. The user will create/update milestones and issues manually. Some entries have since been registered on GitHub: setup is issue #1 (closed), P01 is #5 (closed after PR #6), P02 is #3 (closed after PR #13), and P03 is #4, P08 is #11 (closed after PR #26), P09 is #12 (closed after PR #28), P10 is #18 (closed after PR #32), P11 is #19 (closed after PR #30), P12 is #20 (closed after PRs #29 and #33), P13 is #21 (closed after PR #36), and P14 is #22. Recheck remote status before further updates. Labels and `P01`–`P14` are local planning suggestions, not actual GitHub issue numbers. Existing issue numbers/statuses must be checked before registering duplicates. Dates are intentionally unset until the recruitment deadline is known.
 
 ## Milestones
 
@@ -47,7 +47,7 @@ Milestone: M0. Suggested label: `docs`. Dependency: P01.
 
 **Scope:** Validate setup from a clean environment and document WSL use, lint commands, and minimal editor guidance. Keep VS Code configuration optional and free of machine-specific paths.
 
-Local verification completed on 2026-11-02; see README for the environment, commands, results, and limitations. Documentation was merged in PR #13; issue #3 is closed.
+Local verification completed on 2026-11-02; see [the development guide](DEVELOPMENT.md) for the environment, commands, results, and limitations. Documentation was merged in PR #13; issue #3 is closed.
 
 **Acceptance criteria**
 - [x] Documented setup is executed successfully and its verification is recorded.
