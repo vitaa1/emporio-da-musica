@@ -10,6 +10,32 @@ from .data.records import Snapshot
 MAX_CATALOG_RESULTS = 10
 PIX_DISCOUNT_PERCENT = Decimal("5")  # Supplied manual §3.
 CENT = Decimal("0.01")
+# Supplied manual §3.1: (first count, last count, minimum installment). The 2–3
+# band's minimum wording is ambiguous and requires confirmation instead.
+INSTALLMENT_BANDS = ((4, 6, Decimal("80")), (7, 12, Decimal("100")))
+INSTALLMENT_MINIMUM_NOT_MET = "Requested installments do not meet the minimum."
+
+
+def installment_minimum(count: int) -> Decimal | None:
+    for first, last, minimum in INSTALLMENT_BANDS:
+        if first <= count <= last:
+            return minimum
+    return None
+
+
+def split_installments(total: Decimal, count: int) -> tuple[Decimal, Decimal]:
+    """Equal installments in whole cents; the first carries the remainder."""
+    cents = int((total / CENT).to_integral_value())
+    base, remainder = divmod(cents, count)
+    return Decimal(base) * CENT, Decimal(base + remainder) * CENT
+
+
+def max_installments(total: Decimal) -> int | None:
+    """Largest count in the unambiguous bands whose installments meet the minimum."""
+    for count in range(12, 3, -1):
+        if split_installments(total, count)[0] >= installment_minimum(count):
+            return count
+    return None
 
 
 def normalize(text: str) -> str:
@@ -73,18 +99,10 @@ def _search(snapshot, intent, *, product_id=None):
                 missing_fields=("payment_method", "installments"),
                 reason_code="INCOMPATIBLE_PAYMENT_CONDITIONS",
             )
-        if intent.installments > 1:
+        if 2 <= intent.installments <= 3:
             return ProductSearchResult(
-                status=(
-                    "requires_confirmation"
-                    if intent.installments <= 3
-                    else "unavailable"
-                ),
-                reason_code=(
-                    "AMBIGUOUS_INSTALLMENT_BAND"
-                    if intent.installments <= 3
-                    else "INSTALLMENT_QUOTE_NOT_SUPPORTED"
-                ),
+                status="requires_confirmation",
+                reason_code="AMBIGUOUS_INSTALLMENT_BAND",
                 policy_references=("3.1",),
             )
 
@@ -149,6 +167,23 @@ def _search(snapshot, intent, *, product_id=None):
             total = unit * quantity
         if intent.max_price_brl is not None and total > intent.max_price_brl:
             continue
+        installments = intent.installments
+        credit = {}
+        product_assumptions = assumptions
+        if intent.payment_method == "credit":
+            if installments is None:
+                credit["max_installments"] = max_installments(total)
+            elif installments >= 4:
+                base, first = split_installments(total, installments)
+                if base >= installment_minimum(installments):
+                    credit["installment_amount_brl"] = base
+                    if first != base:
+                        credit["first_installment_brl"] = first
+                else:
+                    # Shown as a note; the requested count is not offered.
+                    installments = None
+                    credit["max_installments"] = max_installments(total)
+                    product_assumptions += (INSTALLMENT_MINIMUM_NOT_MET,)
         quotes.append(
             ProductQuote(
                 product_id=product.product_id,
@@ -158,9 +193,10 @@ def _search(snapshot, intent, *, product_id=None):
                 list_unit_price_brl=product.price_brl,
                 promotion_percent=promotion,
                 payment_method=intent.payment_method,
-                installments=intent.installments,
+                installments=installments,
                 final_total_brl=total,
-                assumptions=assumptions,
+                assumptions=product_assumptions,
+                **credit,
             )
         )
     if not quotes:
@@ -171,5 +207,7 @@ def _search(snapshot, intent, *, product_id=None):
             products=tuple(quotes[:MAX_CATALOG_RESULTS]),
             total_matches=len(quotes),
         ),
-        policy_references=("3", "6"),
+        policy_references=("3", "3.1", "6")
+        if intent.payment_method == "credit"
+        else ("3", "6"),
     )

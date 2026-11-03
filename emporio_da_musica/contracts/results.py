@@ -31,6 +31,12 @@ class ProductQuote(Contract):
     installments: Installments | None
     final_total_brl: Money
     assumptions: tuple[Text, ...] = ()
+    # Credit installments (§3.1): the amount of each installment when the requested
+    # count meets the documented minimum; the first carries any remaining cents.
+    installment_amount_brl: Money | None = None
+    first_installment_brl: Money | None = None
+    # For credit without a count: the largest count in 4–12 meeting the minimum.
+    max_installments: Installments | None = None
 
 
 class CatalogData(Contract):
@@ -47,6 +53,7 @@ class OrderData(Contract):
 
 
 class ShippingData(Contract):
+    quote: ProductQuote
     subtotal_brl: Money
     freight_brl: Money
     destination_city: Text

@@ -169,11 +169,13 @@ Milestone: M3. Suggested labels: `feature`, `domain`. Dependencies: P03, P06, P0
 **Scope:** Implement installment rules only as documented, supported local freight, and explicit limitations for unsupported destinations/combined payment/special quotations.
 
 **Acceptance criteria**
-- [ ] Installment count, minimum amount, rounding, quantity, and payment-method compatibility are tested.
-- [ ] Freight boundary tests include below, exactly, and above BRL 500.
-- [ ] Delivery-region membership and freight subtotal basis are documented, not inferred by the model.
-- [ ] No exact external freight quote or calendar delivery date is fabricated.
-- [ ] Ambiguous/unsupported conditions return the agreed confirmation/unavailable states.
+- [x] Installment count, minimum amount, rounding, quantity, and payment-method compatibility are tested.
+- [x] Freight boundary tests include below, exactly, and above BRL 500.
+- [x] Delivery-region membership and freight subtotal basis are documented, not inferred by the model.
+- [x] No exact external freight quote or calendar delivery date is fabricated.
+- [x] Ambiguous/unsupported conditions return the agreed confirmation/unavailable states.
+
+Implemented on `feature/payment-freight`: §3.1 installment bands with cent-remainder rounding and maximum-count reporting, local Campo Grande/MS freight with BRL 500 boundary confirmation, region confirmation for other destinations, prompt examples, and tests. Code, security, and bug-diagnosis reviews were run and confirmed findings fixed (failed quotes reported before asking the destination, availability before region, payment facts carried into shipping, postal code contradicting the assumed state, once-per-response 2–3 installment note). Quotes also reuse and announce quantity and payment facts from the last successful, available quote of the same selected product; cancel, a new search, or another quote outcome forgets it. 388 offline tests pass.
 
 ## P11 — Add return assessment and missing-fact workflows
 

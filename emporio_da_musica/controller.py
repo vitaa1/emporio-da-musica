@@ -8,7 +8,7 @@ from decimal import Decimal
 from pydantic import ValidationError
 
 from .catalog import normalize, quote_product, search_catalog
-from .composer import BUDGET_IGNORED, compose
+from .composer import BUDGET_IGNORED, CITY_ASSUMED, QUOTE_FACTS_REUSED, compose
 from .contracts.common import MAX_MESSAGE_LENGTH
 from .contracts.dates import Clock, store_today
 from .contracts.intents import (
@@ -23,6 +23,7 @@ from .contracts.intents import (
     ProposalError,
     RequestTooBroadError,
     ReturnAssessment,
+    ShippingQuote,
     SmallTalk,
 )
 from .contracts.results import (
@@ -38,6 +39,8 @@ from .contracts.results import (
     PolicyData,
     PolicyQuestionResult,
     ReturnAssessmentResult,
+    ShippingData,
+    ShippingQuoteResult,
     SmallTalkData,
     SmallTalkResult,
 )
@@ -100,6 +103,11 @@ ADDRESS_ONLY = re.compile(
 STORE_ADDRESS = (
     "A loja fica na Rua 14 de Maio, 3200 — Centro, Campo Grande - MS, 79202-333."
 )
+
+QUOTES = (PaymentOptions, ShippingQuote)
+FREE_FREIGHT_ABOVE = Decimal("500")  # Supplied manual §5.1.
+LOCAL_FREIGHT = Decimal("35")
+LOCAL_CITY = "campo grande"
 
 RECEIPT_WORDS = re.compile(r"\b(hoje|ontem|anteontem)\b")
 MONTHS = (
@@ -165,6 +173,9 @@ class Controller:
         self.session = create_session(snapshot, customer_id)
         self._typed_order_numbers = set()
         self._message = ""
+        # Facts of the last successful quote: (product ID, executed intent).
+        self._last_quote = None
+        self._reused_quote = False
 
     def handle(self, message: str) -> TurnResponse:
         if (
@@ -176,6 +187,8 @@ class Controller:
         message = message.strip()
         if message == "/cancelar":
             self.session = _state(self.session, pending=())
+            # Cancelling also forgets facts of the last completed quote.
+            self._last_quote = None
             return self._finish(
                 message,
                 "Consultas pendentes canceladas; nenhuma transação foi realizada.",
@@ -294,9 +307,12 @@ class Controller:
             if prior is None:
                 # Uses the selection current at this point of the turn, so a search
                 # earlier in the same turn prevents inheriting another product's facts.
+                self._reused_quote = False
                 intent = self._carry_over(intent, selected)
+                if self._reused_quote:
+                    notes.append(QUOTE_FACTS_REUSED)
             execution_intent = intent
-            if prior and isinstance(intent, PaymentOptions):
+            if prior and isinstance(intent, QUOTES):
                 if "product_reference" not in proposal.update.model_fields_set:
                     pinned = prior.records.product_id
                     if "product_reference" in prior.requested_fields:
@@ -317,9 +333,11 @@ class Controller:
                 outcome = _result(intent.type, "error", "OPERATION_FAILED")
                 choices, resolved = None, None
             if isinstance(intent, ProductSearch):
-                # A failed or ambiguous new search must never reuse a stale selection.
+                # A failed or ambiguous new search must never reuse a stale selection
+                # or the facts of an earlier quote.
                 selected = None
-            elif isinstance(intent, PaymentOptions) and resolved is None:
+                self._last_quote = None
+            elif isinstance(intent, QUOTES) and resolved is None:
                 selected = None
             if choices is not None:
                 if choices is not outcome:
@@ -329,12 +347,23 @@ class Controller:
                 selected = ids[0] if choices.data.total_matches == 1 else None
             if resolved is not None:
                 selected = resolved
+            if isinstance(outcome, (PaymentOptionsResult, ShippingQuoteResult)):
+                # Only a successful, available quote is remembered; any other
+                # outcome forgets the earlier facts instead of reviving them later.
+                self._last_quote = None
             if (
-                isinstance(outcome, PaymentOptionsResult)
+                isinstance(outcome, (PaymentOptionsResult, ShippingQuoteResult))
                 and outcome.status == "success"
             ):
-                if outcome.data.product_id not in shown:
-                    shown.append(outcome.data.product_id)
+                quoted = (
+                    outcome.data.quote
+                    if isinstance(outcome.data, ShippingData)
+                    else outcome.data
+                )
+                if quoted.product_id not in shown:
+                    shown.append(quoted.product_id)
+                if quoted.availability == "available":
+                    self._last_quote = (quoted.product_id, intent)
             if isinstance(outcome, OrderStatusResult):
                 # Only a successful, authorized lookup may become the order in focus.
                 selected_order = (
@@ -391,6 +420,8 @@ class Controller:
             return result, result if result.status == "success" else None, None
         if isinstance(intent, PaymentOptions):
             return self._payment(intent, selected, original_display, pinned)
+        if isinstance(intent, ShippingQuote):
+            return self._shipping(intent, selected, original_display, pinned)
         if isinstance(intent, OrderStatus):
             return self._order(intent), None, None
         if isinstance(intent, ReturnAssessment):
@@ -474,7 +505,7 @@ class Controller:
         """
         if isinstance(intent, ReturnAssessment):
             return self._carry_return(intent)
-        if not isinstance(intent, PaymentOptions):
+        if not isinstance(intent, QUOTES):
             return intent
         reference = intent.product_reference
         if reference is not None and reference.kind != "selected":
@@ -483,15 +514,23 @@ class Controller:
             (
                 p
                 for p in self.session.pending
-                if isinstance(p.declarations.intent, PaymentOptions)
+                # Payment and shipping quotes share product, quantity, and payment
+                # facts; only those move between the two intent types.
+                if isinstance(p.declarations.intent, QUOTES)
                 and p.records.product_id is not None
                 and p.records.product_id == selected
             ),
             None,
         )
-        if prior is None:
+        if prior is not None:
+            declared = prior.declarations.intent
+        elif self._last_quote is not None and self._last_quote[0] == selected:
+            # "E o frete dele?" after a completed quote: reuse that quote's facts
+            # for the same selected product only.
+            declared = self._last_quote[1]
+        else:
             return intent
-        declared = prior.declarations.intent
+        from_last_quote = prior is None
         changes = {}
         if reference is None:
             changes["product_reference"] = {"kind": "selected"}
@@ -504,9 +543,19 @@ class Controller:
         ):
             changes["payment_method"] = declared.payment_method
             changes["installments"] = declared.installments
+        if (
+            isinstance(intent, ShippingQuote)
+            and isinstance(declared, ShippingQuote)
+            and intent.destination is None
+            and declared.destination is not None
+        ):
+            changes["destination"] = declared.destination.model_dump()
         if not changes:
             return intent
-        return PaymentOptions.model_validate(intent.model_dump() | changes)
+        if from_last_quote and set(changes) - {"product_reference"}:
+            # Reused facts are announced so a discount is never applied silently.
+            self._reused_quote = True
+        return type(intent).model_validate(intent.model_dump() | changes)
 
     def _policy(self, intent):
         if not hasattr(self.provider, "explain"):
@@ -705,6 +754,103 @@ class Controller:
                 status="success",
                 data=quote.data.products[0],
                 policy_references=quote.policy_references,
+            ),
+            choices,
+            resolved,
+        )
+
+    def _shipping(self, intent, selected, original_display, pinned):
+        """Local freight only (§5.1); the subtotal follows the payment quote."""
+        quote, choices, resolved = self._payment(
+            PaymentOptions(
+                type="payment_options",
+                product_reference=intent.product_reference,
+                quantity=intent.quantity,
+                payment_method=intent.payment_method,
+                installments=intent.installments,
+            ),
+            selected,
+            original_display,
+            pinned,
+        )
+        if quote.status not in ("success", "needs_information"):
+            # A failed quote is reported directly; no destination is requested.
+            return (
+                ShippingQuoteResult(
+                    status=quote.status,
+                    reason_code=quote.reason_code,
+                    policy_references=quote.policy_references,
+                ),
+                choices,
+                resolved,
+            )
+        if quote.status == "success" and quote.data.availability != "available":
+            return (
+                _result("shipping_quote", "unavailable", "PRODUCT_NOT_SHIPPABLE"),
+                choices,
+                resolved,
+            )
+        city = intent.destination.city if intent.destination else None
+        missing = list(quote.missing_fields)
+        if city is None:
+            missing.append("destination")
+        if missing:
+            return (
+                _result(
+                    "shipping_quote",
+                    "needs_information",
+                    "SHIPPING_FACTS_MISSING",
+                    tuple(missing),
+                ),
+                choices,
+                resolved,
+            )
+        state = intent.destination.state
+        postal_code = intent.destination.postal_code
+        # Only the declared city is used; a postal code or the customer's record
+        # never establishes the delivery region.
+        # Without a state, a postal code outside MS (79xxx) contradicts the
+        # assumption that "Campo Grande" means Campo Grande/MS.
+        foreign_postal = (
+            state is None
+            and postal_code is not None
+            and not postal_code.startswith("79")
+        )
+        if normalize(city) != LOCAL_CITY or state not in (None, "MS") or foreign_postal:
+            return (
+                _result(
+                    "shipping_quote",
+                    "requires_confirmation",
+                    "DELIVERY_REGION_UNCONFIRMED",
+                ).model_copy(update={"policy_references": ("5", "5.2")}),
+                choices,
+                resolved,
+            )
+        subtotal = quote.data.final_total_brl
+        if subtotal == FREE_FREIGHT_ABOVE:
+            return (
+                _result(
+                    "shipping_quote", "requires_confirmation", "FREE_FREIGHT_BOUNDARY"
+                ).model_copy(update={"policy_references": ("5.1",)}),
+                choices,
+                resolved,
+            )
+        assumptions = () if state else (CITY_ASSUMED,)
+        return (
+            ShippingQuoteResult(
+                status="success",
+                data=ShippingData(
+                    quote=quote.data,
+                    subtotal_brl=subtotal,
+                    freight_brl=(
+                        Decimal("0.00")
+                        if subtotal > FREE_FREIGHT_ABOVE
+                        else LOCAL_FREIGHT
+                    ),
+                    destination_city="Campo Grande/MS",
+                    assumptions=assumptions,
+                ),
+                policy_references=("5.1", *quote.policy_references),
             ),
             choices,
             resolved,
