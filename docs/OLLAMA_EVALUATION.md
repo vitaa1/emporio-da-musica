@@ -109,3 +109,9 @@ These single development runs are not accuracy estimates. Python guards prevente
 - "O Yamaha C40 tem estoque? E vai chover amanhã?" dropped the product search and returned only the general redirect.
 - In an address-plus-hours answer, the policy model cited only §1.2, not §2.
 - Relative receipt dates without month and year cannot be resolved by the model, which has no current date.
+
+## List references and PIX evidence
+
+On 2026-11-03, `qwen2.5:3b` was compared with and without a new-product example on four sequences, three runs each. Without it, "adicione uma unidade do Crafter HT-100…" after a C40 PIX quote also requoted the C40 in all three runs; with it, only the Crafter was quoted, but the model copied `pix` in all three runs, even after a prompt rule against it. Prompt guidance therefore did not suffice, and Python now requires evidence for PIX, the only method that changes a price.
+
+A final single run of three sequences gave the expected results for the Crafter follow-up (asks payment, then boleto), "E se forem 2 unidades?" (PIX reused with a notice), and ordinal quotes. Two gaps remain: "e em 10 vezes no crédito?" reported a maximum of 6x instead of the requested count, consistent with quantity 1 though the raw output was not captured, and "não quero pix, quanto fica?" gave no PIX discount but stayed on credit without asking. These are small development samples, not accuracy estimates.

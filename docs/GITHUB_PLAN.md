@@ -212,6 +212,8 @@ Completed on `feature/service-fallbacks`: separate accessory and unrelated-topic
 
 ## P13 — Evaluate the complete agent and extend CI
 
+Inputs recorded in `docs/OLLAMA_EVALUATION.md` (observed misinterpretations and open gaps).
+
 Milestone: M4. Suggested labels: `test`, `evaluation`, `ci`. Dependencies: P09–P12.
 
 **Scope:** Consolidate offline regression tests and a small versioned live-model evaluation set, distinct from few-shot examples. Run and report real results rather than relying on illustrative answers.

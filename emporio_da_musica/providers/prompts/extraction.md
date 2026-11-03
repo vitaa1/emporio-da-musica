@@ -247,3 +247,36 @@ Saída:
 ```
 
 Não deduza cidade, estado, valor do frete ou elegibilidade regional a partir do CEP.
+
+### Exemplo 4: Novo Produto após Cotação Anterior
+
+Contexto: o usuário já cotou um violão Yamaha C40; pagamento não informado.
+Usuário: "gostaria de adicionar mais um instrumento, adicione uma unidade do Crafter HT-100 folk aco natural"
+Saída:
+
+```json
+{
+  "intents": [
+    {
+      "type": "payment_options",
+      "product_reference": {
+        "kind": "query",
+        "query": "Crafter HT-100 folk aco natural"
+      },
+      "quantity": 1,
+      "payment_method": null,
+      "installments": null
+    }
+  ]
+}
+```
+
+Um produto novo usa query; não reutilize a referência do produto anterior.
+Sem pagamento na mensagem atual, payment_method é null; Python reaproveita ou pede o dado.
+
+### Exemplo 5: Mesmo Produto após Cotação Anterior
+
+Contexto: o usuário acabou de cotar um produto no PIX.
+Usuário: "E se forem 2 unidades?"
+Saída: {"intents":[{"type":"payment_options","product_reference":{"kind":"selected"},"quantity":2,"payment_method":null,"installments":null}]}
+Sem nome de produto na mensagem, use selected; não repita o nome do histórico.

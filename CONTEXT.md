@@ -1,6 +1,6 @@
 # Empório da Música
 
-Last updated: 2026-11-03.
+Last updated: 2026-11-03 (after the list-reference and PIX-evidence work).
 
 This document preserves project context for continuing development with coding assistants (Codex CLI and, from 2026-11-03, Claude Code) in WSL. It is a handoff snapshot, not a claim about the current checkout or remote state. Check the actual files before making changes.
 
@@ -41,7 +41,8 @@ Windows-hosted Ollama is reachable from WSL at the Windows host address (`ip rou
 - P10 (#18) merged through PR #32 at `b641010`.
 - P12 (#20) completed through PR #33 at `171ca28` (415 offline tests; CI passed on all platforms). M3 is complete; issues #18, #19, and #20 are closed.
 - Next: P13 (#21, 3–5 example conversations and evaluations, including live misclassifications seen in P10/P11), then P14 (#22, README decisions, limitations, AI-assistant usage). The recruitment deadline is still unknown.
-- Known pre-existing defects (present before P09; rechecked and still reproducible after PR #33): quoting a displayed list item replaces the displayed list with only that product, so a following ordinal may fail; a quote without a product after `/cancelar` clears the selection.
+- `fix/list-references` (PR pending at the time of this note; check GitHub): quoting a list item keeps the displayed list; a quote without a product keeps the selection; payment-only product references are dropped; new-product and same-product prompt examples; PIX-only, fail-closed evidence check; fact reuse is announced and blocked when the message mentions payment or names another product. 463 offline tests. Three review rounds ran on earlier versions; the simplified PIX design was checked live but not re-reviewed.
+- Open behavior gaps for P13 evaluation: "e em 10 vezes no crédito?" after a quantity follow-up reports a maximum instead of the 10x quote; "não quero pix, quanto fica?" after a credit quote stays on credit without asking; model quantity is unchecked; there is no basket; non-PIX methods copied by the model are not filtered (they do not change totals).
 - A manual test guide was drafted in chat but not saved to the repository.
 
 - Setup issue #1 is complete. EditorConfig/Ruff issue #5 was merged through PR #6 at commit `74eb53c` and is closed.

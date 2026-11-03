@@ -51,7 +51,11 @@ class PendingOperation(Contract):
         if update.update.type != self.declarations.intent.type:
             raise ValueError("Clarification cannot change operation type")
         supplied = update.update.model_fields_set - {"type"}
-        if not supplied or not supplied <= set(self.requested_fields):
+        allowed = set(self.requested_fields)
+        if "payment_method" in allowed and "payment_method" in supplied:
+            # "No crédito em 6x" answers both facts at once.
+            allowed.add("installments")
+        if not supplied or not supplied <= allowed:
             raise ValueError("Clarification contains unrequested fields")
         # JSON serialization preserves decimal-string budgets across revalidation.
         merged = self.declarations.intent.model_dump(mode="json")

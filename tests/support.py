@@ -25,13 +25,32 @@ class FakeProvider:
         return response if isinstance(response, str) else json.dumps(response)
 
 
-def turn(app, *intents, message="synthetic customer message"):
+METHOD_WORDS = {
+    "pix": "pix",
+    "debit": "debito",
+    "credit": "credito",
+    "boleto": "boleto",
+    "combined": "pagamento combinado",
+}
+
+
+def _message(base, *intents):
+    """A neutral message naming only the payment methods the intents declare."""
+    methods = [i.get("payment_method") for i in intents]
+    return " ".join([base, *(METHOD_WORDS[m] for m in methods if m)])
+
+
+def turn(app, *intents, message=None):
     app.provider.responses.append({"intents": intents})
+    if message is None:
+        message = _message("synthetic customer message", *intents)
     return app.handle(message)
 
 
-def update(app, message="synthetic correction", **fields):
+def update(app, message=None, **fields):
     pending = app.session.pending[0]
+    if message is None:
+        message = _message("synthetic correction", fields)
     app.provider.responses.append(
         {
             "pending_id": pending.pending_id,
