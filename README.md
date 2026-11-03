@@ -17,7 +17,8 @@ These documents distinguish implemented data loading from planned conversational
 - `data/loader.py`: CSV parsing, source validation, relationship checks, and index construction.
 - `providers/base.py`: provider-neutral request contracts, protocol, and errors.
 - `providers/extraction.py`: proposal validation and the single schema-repair attempt.
-- `providers/demo.py`: command-based demonstration adapter; a real adapter remains P08 work.
+- `providers/demo.py`: command-based demonstration adapter used for offline runs.
+- `providers/ollama.py`: local Ollama adapter (P08); see the Ollama section below.
 - `contracts/`: typed intents, results, dates, and session state.
 - `controller.py`, `catalog.py`, `composer.py`, and `cli.py`: orchestration, business queries, response rendering, and terminal interaction respectively.
 

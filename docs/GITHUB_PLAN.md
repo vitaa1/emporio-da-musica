@@ -1,6 +1,6 @@
 # GitHub Milestones and Issues
 
-Ready-to-copy planning draft, 2026-11-02. The user will create/update milestones and issues manually. Some entries have since been registered on GitHub: setup is issue #1 (closed), P01 is #5 (closed after PR #6), P02 is #3 (closed after PR #13), and P03 is #4. Recheck remote status before further updates. Labels and `P01`–`P14` are local planning suggestions, not actual GitHub issue numbers. Existing issue numbers/statuses must be checked before registering duplicates. Dates are intentionally unset until the recruitment deadline is known.
+Ready-to-copy planning draft, 2026-11-02. The user will create/update milestones and issues manually. Some entries have since been registered on GitHub: setup is issue #1 (closed), P01 is #5 (closed after PR #6), P02 is #3 (closed after PR #13), and P03 is #4, P08 is #11 (closed after PR #26), and P09 is #12. Recheck remote status before further updates. Labels and `P01`–`P14` are local planning suggestions, not actual GitHub issue numbers. Existing issue numbers/statuses must be checked before registering duplicates. Dates are intentionally unset until the recruitment deadline is known.
 
 ## Milestones
 
@@ -13,6 +13,8 @@ Ready-to-copy planning draft, 2026-11-02. The user will create/update milestones
 | M4 — Evaluation and submission | Reproducible evaluations, real demonstrations, complete README, and final delivery verification. | P13–P14 |
 
 Suggested order: P01 → P02 → P03 → P04 → P05 → P06 → P07 → P08 → P09 → P10 → P11 → P12 → P13 → P14. Dependencies below identify actual blockers; do not add tools or infrastructure merely to make milestones larger.
+
+Revised order after the 2026-11-03 requirement review: P09 → P12 (minimal slice) → P10 → P11 → remaining P12 → P13 → P14. The assignment's mandatory behaviors include answering policy questions (hours, address, payments, exchanges) and handling out-of-scope messages, which currently return `OPERATION_NOT_SUPPORTED`. The minimal P12 slice covers general `policy_question` answers grounded in the manual with section references, out-of-scope/accessory redirection, and small talk. Case-specific payment, freight, and return assessments remain in P10/P11 and must not be bypassed by general policy prose. If time becomes tight, reduce P10/P11 breadth rather than the minimal P12 slice.
 
 The earlier preparation plan included EditorConfig/Ruff, VS Code configuration, and setup validation. P01 covers tooling; P02 consolidates setup validation and minimal optional editor configuration. Reuse/update existing issues rather than opening replacements blindly.
 
@@ -135,7 +137,7 @@ Milestone: M2. Suggested labels: `feature`, `evaluation`. Dependency: P07.
 
 **Scope:** Select one model/provider based on representative extraction quality, cost, and setup; connect it to the existing boundary. Add persona, structured-output instructions, full reviewed manual context, and three or four behavioral examples.
 
-Implemented locally on `feature/ollama-integration` with Ollama and configurable `qwen2.5:3b`. The natural-language CLI, full extracted manual, structured schemas, offline adapter tests, and opt-in live evaluation exist. The final contextual-reference prompt passed the three-turn Qwen development evaluation, including quantity correction; earlier semantic failures and the Gemma comparison are retained in the report. The review error-handling fixes pass all 209 offline tests. See OLLAMA_EVALUATION.md. Publication, review, and remote CI remain pending.
+Merged through PR #26 at `6858b10`; issue #11 is closed and all three platform checks passed. Implemented with Ollama and configurable `qwen2.5:3b`. The natural-language CLI, full extracted manual, structured schemas, offline adapter tests, and opt-in live evaluation exist. The final contextual-reference prompt passed the three-turn Qwen development evaluation, including quantity correction; earlier semantic failures and the Gemma comparison are retained in the report. The review error-handling fixes pass all 209 offline tests. See OLLAMA_EVALUATION.md.
 
 **Acceptance criteria**
 - [x] Model choice and observed tradeoffs are documented; model name is configurable.
@@ -219,7 +221,7 @@ Milestone: M4. Suggested labels: `docs`, `delivery`. Dependency: P13.
 
 **Acceptance criteria**
 - [ ] README includes actual commands, provider configuration, architecture decisions, limitations, and next improvements.
-- [ ] README discloses Codex usage for requirements analysis, planning, and any subsequent implementation/testing assistance actually used.
+- [ ] README discloses Codex and Claude Code usage for requirements analysis, planning, and any subsequent implementation/testing assistance actually used.
 - [ ] Three to five real conversation transcripts cover varied cases including a nontrivial rule/data operation; redact unnecessary customer data.
 - [ ] Fresh-environment execution is verified; examples match implemented behavior.
 - [ ] Public repository visibility, incremental history, passing checks, and deadline are verified by the user before submission.

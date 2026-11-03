@@ -1,8 +1,8 @@
 # Empório da Música
 
-Last updated: 2026-11-02.
+Last updated: 2026-11-03.
 
-This document preserves project context for continuing development with Codex CLI in WSL. It is a handoff snapshot, not a claim about the current checkout or remote state. Check the actual files before making changes.
+This document preserves project context for continuing development with coding assistants (Codex CLI and, from 2026-11-03, Claude Code) in WSL. It is a handoff snapshot, not a claim about the current checkout or remote state. Check the actual files before making changes.
 
 ## Collaboration
 
@@ -21,8 +21,9 @@ This document preserves project context for continuing development with Codex CL
 ## Current project status
 
 - The official extraction prompt is versioned in `providers/prompts/extraction.md`. With the added contextual-reference examples, Qwen 3B passed the three-turn smoke sequence; Gemma 4B selected the wrong product on the quote step. This is a limited development evaluation, not a general reliability claim. The model default remains unchanged.
-- P08 is being implemented on `feature/ollama-integration` using Windows-hosted Ollama and `qwen2.5:3b`. The local adapter, full manual context, natural-language CLI, offline transport tests, and opt-in evaluation exist. See `docs/OLLAMA_EVALUATION.md` for actual results and limitations. Publication and remote CI are pending.
-- The package refactor merged through PR #25 at `e0a0aa7`; main was synchronized before creating the P08 branch.
+- P08 (issue #11) was merged through PR #26 at `6858b10`; all three PR checks passed and issue #11 is closed. It uses Windows-hosted Ollama with the configurable default `qwen2.5:3b`. The local adapter, full manual context, natural-language CLI, offline transport tests, and opt-in evaluation exist; 209 offline tests pass. See `docs/OLLAMA_EVALUATION.md` for actual results and limitations. The remote `feature/ollama-integration` branch still exists; deleting it requires user authorization.
+- The package refactor merged through PR #25 at `e0a0aa7`.
+- Next planned work is P09 (issue #12), session-scoped order lookup, followed by a minimal P12 slice (general policy answers, out-of-scope, small talk) before P10/P11. See the revised order in `docs/GITHUB_PLAN.md`.
 
 - Setup issue #1 is complete. EditorConfig/Ruff issue #5 was merged through PR #6 at commit `74eb53c` and is closed.
 - Issue #3 (P02) covers contributor-workflow validation and documentation synchronization. It was merged through PR #13 at commit `0f7f59f`; issue #3 is closed.
@@ -31,7 +32,7 @@ This document preserves project context for continuing development with Codex CL
 - P05 (issue #8) was merged through PR #17 at `84ee5ae`; the user confirmed M1 complete. Strict contracts and provider extraction are covered by 75 tests.
 - P06 (issue #9) was merged through PR #23 at `4df666e`; the local main was synchronized after the user confirmed merge and remote branch deletion. Includes 32 catalog tests.
 - P07 (issue #10) was merged through PR #24 at `7abdaf5`. The offline CLI/controller, deterministic composition, and scoped references are covered by 39 tests (192 total). Main was synchronized after user confirmation of merge and remote branch deletion.
-- A small package refactor is implemented locally on `refactor/package-organization`: records/loader in `data/`, neutral provider boundary/extraction/demo in `providers/`, and separate controller/CLI/rendering test modules. All 192 tests pass; function/class definitions and existing assertions are preserved. Commands and dependency pins are unchanged; Python import paths are updated in README. Commit/publication and remote CI remain pending.
+- The package refactor (PR #25) placed records/loader in `data/`, the neutral provider boundary/extraction/demo in `providers/`, and split controller/CLI/rendering test modules. Behavior, commands, and dependency pins were unchanged.
 - Original source CSVs remain external. A derived snapshot in `data/demo/` is bundled for evaluation; customer details, order notes, and tracking codes are synthetic, while catalog facts and order relationships are preserved. The validation command uses this demo by default. Pydantic contracts are implemented locally; order query authorization, remaining business rules, and live provider integration remain planned; the offline catalog CLI is implemented.
 - Create the issue branch before starting each new task. The user has authorized this branch workflow; commits, pushes, and merges still require authorization covering those actions.
 
@@ -186,4 +187,4 @@ At the user's explicit request, the analysis, architecture, contract, and GitHub
 
 P01–P14 are local planning IDs, not GitHub numbers. Known mappings are P01 → #5, P02 → #3, and P03 → #4. Recheck GitHub before registering duplicates. The recruitment deadline remains unknown; no milestone dates were invented. The original architecture analysis did not implement application code.
 
-P03 documentation was prepared on 2026-11-02 for issue #4. Architecture now defines conservative policy deferrals, supported delivery scope, simulated identity, and the store clock/calendar contract. The text of all eight pages of the original manual was rechecked against these decisions. All six CSV headers and row counts also match the dataset summary; this check did not repeat full record validation or import the files. P03 has since merged through PR #15. P04 now loads and validates the original bundle successfully. Its 46 tests passed with pytest 9.2.0 and all three CI checks passed before merge through PR #16. P05 adds 75 contract tests and runtime dependency pins; review/publication and its remote CI remain pending. Update these documents alongside implementation; preserve the distinction between plans and verified behavior.
+P03 documentation was prepared on 2026-11-02 for issue #4. Architecture now defines conservative policy deferrals, supported delivery scope, simulated identity, and the store clock/calendar contract. The text of all eight pages of the original manual was rechecked against these decisions. All six CSV headers and row counts also match the dataset summary; this check did not repeat full record validation or import the files. P03 has since merged through PR #15. P04 now loads and validates the original bundle successfully. Its 46 tests passed with pytest 9.2.0 and all three CI checks passed before merge through PR #16. P05 added 75 contract tests and runtime dependency pins and merged through PR #17. Update these documents alongside implementation; preserve the distinction between plans and verified behavior.
