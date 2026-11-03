@@ -6,7 +6,8 @@ The repository contains development tooling, an in-memory CSV loader, typed Pyda
 
 - `emporio_da_musica/`: CSV records, validation, indexes, and a count-only validation command.
 - `emporio_da_musica/contracts/`: intents, results, dates, and internal session contracts.
-- `emporio_da_musica/provider.py`: provider-independent extraction boundary.
+- `emporio_da_musica/data/`: snapshot records and CSV loading in separate modules.
+- `emporio_da_musica/providers/`: provider protocol, extraction validation, and demonstration adapter.
 - `emporio_da_musica/controller.py`, `composer.py`, and `cli.py`: offline catalog execution, response templates, and demonstration CLI.
 - `tests/`: synthetic loader, bundled demo, contract, catalog, and controller/CLI tests.
 - `pyproject.toml`: Python `>=3.13,<3.14`, metadata, and direct dependencies.

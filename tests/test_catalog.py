@@ -9,7 +9,8 @@ import pytest
 
 from emporio_da_musica.catalog import search_catalog
 from emporio_da_musica.contracts.intents import ProductSearch
-from emporio_da_musica.data import Category, Product, Promotion, Snapshot, load_snapshot
+from emporio_da_musica.data.loader import load_snapshot
+from emporio_da_musica.data.records import Category, Product, Promotion, Snapshot
 
 
 @pytest.fixture

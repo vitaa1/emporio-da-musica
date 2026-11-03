@@ -11,6 +11,22 @@ The development environment, in-memory CSV loader, typed agent/controller contra
 
 These documents distinguish implemented data loading from planned conversational behavior. Contract schemas, limits, and offline catalog execution are implemented; real-model interpretation remains planned. Architecture now records P03 policy decisions and explicit deferrals; these were checked against the supplied manual, with catalog availability and nonstacking price rules now implemented.
 
+## Package organization
+
+- `data/records.py`: typed records and the in-memory snapshot, without CSV parsing dependencies.
+- `data/loader.py`: CSV parsing, source validation, relationship checks, and index construction.
+- `providers/base.py`: provider-neutral request contracts, protocol, and errors.
+- `providers/extraction.py`: proposal validation and the single schema-repair attempt.
+- `providers/demo.py`: command-based demonstration adapter; a real adapter remains P08 work.
+- `contracts/`: typed intents, results, dates, and session state.
+- `controller.py`, `catalog.py`, `composer.py`, and `cli.py`: orchestration, business queries, response rendering, and terminal interaction respectively.
+
+Imports target these modules explicitly; package initializers do not eagerly import adapters or loaders. The CLI owns demo usage guidance and constructs the provider. The controller depends on the provider protocol and extraction function. Domain/session code imports snapshot types from `data.records`, without importing the CSV loader.
+
+The package reorganization changes Python import paths: use `data.loader` for `load_snapshot`/`DataError`, `data.records` for record types, and `providers.base`/`providers.extraction` for the former provider module. `DemoProvider` belongs to `providers.demo`. Both documented CLI commands retain their behavior and paths.
+
+Tests separate controller behavior (`test_controller.py`), terminal interaction (`test_cli.py`), and rendering (`test_composer.py`). Shared synthetic setup is in `conftest.py` and conversation builders are in `support.py`. Existing assertions and parameterized cases are preserved; this refactor adds no runtime dependency or application capability.
+
 ## Validate the supplied data (P04)
 
 After installing the development environment, run from the repository root:
@@ -33,7 +49,7 @@ Required filenames are `desafio_tecnico_ai_eng - categories.csv`, `desafio_tecni
 
 The command prints only table counts on success and exits with status 1 on data errors. The supplied snapshot produces 9 categories, 65 products, 50 customers, 20 orders, 22 order items, and 25 promotions. Counts are audit evidence, not hardcoded validation constraints.
 
-`emporio_da_musica.data.load_snapshot(path)` returns typed records indexed by primary ID (order items by order/product pair), plus products by category, orders by customer, items by order, and promotions by product. IDs and item quantities must be positive integers; stock and amounts may be zero. Amounts use `Decimal`, with at most two decimal places for currency. Percentages are between 0 and 100. Dates must be valid `YYYY-MM-DD` dates. Product specs must be JSON objects; duplicate keys and nonfinite numbers are rejected. Promotion flags accept only `0` and `1`. Only order tracking, estimated delivery, and notes may be blank, becoming `None`.
+`emporio_da_musica.data.loader.load_snapshot(path)` returns typed records indexed by primary ID (order items by order/product pair), plus products by category, orders by customer, items by order, and promotions by product. IDs and item quantities must be positive integers; stock and amounts may be zero. Amounts use `Decimal`, with at most two decimal places for currency. Percentages are between 0 and 100. Dates must be valid `YYYY-MM-DD` dates. Product specs must be JSON objects; duplicate keys and nonfinite numbers are rejected. Promotion flags accept only `0` and `1`. Only order tracking, estimated delivery, and notes may be blank, becoming `None`.
 
 Known product/order statuses are validated. Historical payment methods preserve `pix`, `debit`, `boleto`, or `credit_1x` through `credit_12x`; loading a recorded payment does not approve current payment conditions. Historical totals are never recomputed. Discontinued/coming-soon stock, empty categories, and inactive promotions remain available as source facts. No stock availability, policy eligibility, or actual receipt is inferred.
 
@@ -41,7 +57,7 @@ The loader validates all foreign keys and duplicate keys before returning a snap
 
 ## Typed agent/controller contracts
 
-`emporio_da_musica/contracts/` defines strict Pydantic intents, results, clarification updates, and session state. `emporio_da_musica/provider.py` supplies a provider-independent extraction boundary tested with a fake provider. It does not call an LLM or execute business operations yet. See [the contract](docs/CONTRACT.md#implemented-interfaces-and-limits) for payload examples, five-intent limits, missing-quantity behavior, store date handling, and the separation between model proposals and Python-owned identity/prices.
+`emporio_da_musica/contracts/` defines strict Pydantic intents, results, clarification updates, and session state. `emporio_da_musica/providers/` supplies a provider-independent extraction boundary tested with a fake provider. It does not call an LLM or execute business operations yet. See [the contract](docs/CONTRACT.md#implemented-interfaces-and-limits) for payload examples, five-intent limits, missing-quantity behavior, store date handling, and the separation between model proposals and Python-owned identity/prices.
 
 Pydantic validates structure and tzdata supplies the store timezone on all supported platforms. Runtime-only setup uses `.venv/bin/python -m pip install -r requirements.txt`; development setup uses `requirements-dev.txt`, which includes runtime dependencies and pytest/Ruff/pip-tools. No provider credentials are required for the contract tests.
 

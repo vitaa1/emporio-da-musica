@@ -1,15 +1,14 @@
 """Offline catalog CLI with an explicitly limited demonstration provider."""
 
 import argparse
-import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .contracts.common import MAX_MESSAGE_LENGTH
 from .controller import Controller
-from .data import DataError, load_snapshot
-from .provider import ProviderError
+from .data.loader import DataError, load_snapshot
+from .providers.demo import DemoProvider
 
 HELP = """Demonstração offline, sem modelo de linguagem.
 /buscar NOME — procurar produtos (ou /buscar para listar)
@@ -20,52 +19,6 @@ HELP = """Demonstração offline, sem modelo de linguagem.
 /cancelar — cancelar consultas pendentes
 /sair — encerrar
 """
-
-
-class DemoProvider:
-    """Command-to-proposal fake; no natural-language interpretation or execution."""
-
-    def propose(self, request):
-        parts = request.message.split(maxsplit=1)
-        command = parts[0]
-        rest = parts[1] if len(parts) > 1 else ""
-        try:
-            if command == "/buscar":
-                intent = {"type": "product_search"}
-                if rest:
-                    intent["query"] = rest
-            elif command == "/preco":
-                position, quantity, method = rest.split()
-                intent = {
-                    "type": "payment_options",
-                    "product_reference": {"kind": "ordinal", "ordinal": int(position)},
-                    "quantity": int(quantity),
-                    "payment_method": method,
-                }
-            elif (
-                command in {"/escolher", "/quantidade", "/pagamento"}
-                and request.pending
-            ):
-                target = request.pending[0]
-                if command == "/escolher":
-                    patch = {
-                        "product_reference": {"kind": "ordinal", "ordinal": int(rest)}
-                    }
-                elif command == "/quantidade":
-                    patch = {"quantity": int(rest)}
-                else:
-                    patch = {"payment_method": rest}
-                return json.dumps(
-                    {
-                        "pending_id": target.pending_id,
-                        "update": {"type": target.operation, **patch},
-                    }
-                )
-            else:
-                raise ValueError
-        except ValueError:
-            raise ProviderError("Invalid demonstration command") from None
-        return json.dumps({"intents": [intent]})
 
 
 COMMAND_USAGE = {

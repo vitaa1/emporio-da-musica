@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from emporio_da_musica.data import load_snapshot
+from emporio_da_musica.data.loader import load_snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
 

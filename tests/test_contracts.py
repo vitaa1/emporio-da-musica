@@ -33,12 +33,12 @@ from emporio_da_musica.contracts.session import (
     SessionState,
     create_session,
 )
-from emporio_da_musica.data import load_snapshot
-from emporio_da_musica.provider import (
+from emporio_da_musica.data.loader import load_snapshot
+from emporio_da_musica.providers.base import (
     ProviderError,
     ProviderRequest,
-    extract_proposal,
 )
+from emporio_da_musica.providers.extraction import extract_proposal
 
 
 def clock():
