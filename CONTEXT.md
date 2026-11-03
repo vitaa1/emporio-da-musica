@@ -36,7 +36,8 @@ Windows-hosted Ollama is reachable from WSL at the Windows host address (`ip rou
 - P09 (issue #12), session-scoped order lookup, merged through PR #28 at `c62720b`; M2 is complete.
 - A minimal P12 slice (policy answers, out-of-scope, small talk, complaints) merged through PR #29 at `8702d8a`. Issue #20 stays open for the remaining P12 criteria.
 - GitHub issue mapping: P10 → #18, P11 → #19, P12 → #20, P13 → #21, P14 → #22 (all open). M0–M2 are complete.
-- P11 (#19), return assessment, is implemented on `feature/return-assessment` (310 offline tests; reviews applied; live Qwen sequences passed); commit and PR are pending. Next fix on a separate branch: "Qual o endereço da loja?" is sometimes answered as out of scope because the policy model returns covered=false; answer the address deterministically from §1.2.
+- P11 (#19), return assessment, merged through PR #30 at `6be1ded`.
+- Address fix on `fix/store-address-answer`: "Qual o endereço da loja?" (an assignment example) was sometimes answered as out of scope because the policy model returned covered=false; an uncovered or failed answer to an explicit, store-anchored address question now falls back to fixed §1.2 text and contact detection uses the isolated question (349 offline tests; two review rounds applied). Commit and PR are pending.
 - Next: P10 (#18), remaining P12, P13, P14. The recruitment deadline is still unknown.
 - Known pre-existing defects (also on main before P09, not yet fixed): quoting a displayed list item replaces the displayed list with only that product, so a following ordinal may fail; a quote without a product after `/cancelar` clears the selection.
 - A manual test guide was drafted in chat but not saved to the repository.
