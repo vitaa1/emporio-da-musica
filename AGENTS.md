@@ -2,14 +2,14 @@
 
 ## Project Structure & Documentation
 
-The repository contains development tooling, an in-memory CSV loader, typed Pydantic contracts, an offline catalog controller/CLI, and deterministic tests. Local Ollama extraction is available; live checks must remain opt-in.
+The repository contains development tooling, an in-memory CSV loader, typed Pydantic contracts, the agent controller/CLI, and deterministic tests. Local Ollama extraction is available; live checks must remain opt-in.
 
 - `emporio_da_musica/`: CSV records, validation, indexes, and a count-only validation command.
 - `emporio_da_musica/contracts/`: intents, results, dates, and internal session contracts.
 - `emporio_da_musica/data/`: snapshot records and CSV loading in separate modules.
 - `emporio_da_musica/providers/`: provider protocol, extraction validation, and demonstration adapter.
-- `emporio_da_musica/controller.py`, `composer.py`, and `cli.py`: offline catalog execution, response templates, and demonstration CLI.
-- `tests/`: synthetic loader, bundled demo, contract, catalog, and controller/CLI tests.
+- `emporio_da_musica/controller.py`, `catalog.py`, `returns.py`, `composer.py`, and `cli.py`: orchestration, catalog/payment rules, return assessments, response templates, and CLI.
+- `tests/`: synthetic loader, bundled demo, contract, catalog, order, policy, return, shipping, and controller/CLI tests.
 - `pyproject.toml`: Python `>=3.13,<3.14`, metadata, and direct dependencies.
 - `requirements.txt` and `requirements-dev.txt`: generated runtime and development pins.
 - `.github/workflows/ci.yml`: cross-platform setup checks.
