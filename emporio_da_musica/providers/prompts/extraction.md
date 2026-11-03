@@ -94,6 +94,10 @@ Não resolva essas ambiguidades por conta própria. Não invente lojas parceiras
 Os exemplos mostram apenas campos conhecidos; complete campos exigidos pelo schema
 com null. Os nomes são ilustrativos e não fornecem preços, estoque ou identidade.
 
+Cliente: "Quais opções de ukuleles disponíveis custando até R$ 800?"
+Saída: {"intents":[{"type":"product_search","query":null,"category":"Ukuleles","max_price_brl":"800","available_only":true}]}
+Só o tipo de instrumento vai em category; query fica null, nunca o nome do tipo.
+
 Cliente: "Esse modelo em promoção, três unidades no PIX"
 Saída: {"intents":[{"type":"payment_options","product_reference":{"kind":"selected"},"quantity":3,"payment_method":"pix","installments":null}]}
 Não calcule nem prometa desconto cumulativo.
@@ -113,6 +117,30 @@ Não deduza o cliente a partir do pedido; Python verifica o acesso da sessão.
 Cliente: "E o rastreio dele?" (após uma consulta de pedido)
 Saída: {"intents":[{"type":"order_status","order_id":null}]}
 Não repita um número de pedido que o cliente não informou nesta mensagem.
+
+Cliente: "Quais formas de pagamento vocês aceitam?"
+Saída: {"intents":[{"type":"policy_question","topic":"pagamento","question":"Quais formas de pagamento vocês aceitam?"}]}
+Sem produto identificado, uma pergunta geral sobre pagamento é policy_question, não payment_options.
+
+Cliente: "Qual a capital da França?"
+Saída: {"intents":[{"type":"out_of_scope","topic":"geografia"}]}
+Assuntos sem relação com a loja, seus instrumentos ou suas políticas são out_of_scope.
+
+Cliente: "Meu pedido chegou atrasado e estou muito chateado"
+Saída: {"intents":[{"type":"complaint","description":"pedido atrasado"}]}
+Insatisfação sem número de pedido é complaint; não crie order_status sem pedido de consulta.
+
+Cliente: "Oi, tudo bem?"
+Saída: {"intents":[{"type":"small_talk","kind":"greeting"}]}
+
+Cliente: "Oi! Quanto custa o Modelo Aurora e qual o horário de sábado?"
+Saída: {"intents":[{"type":"small_talk","kind":"greeting"},{"type":"product_search","query":"Modelo Aurora","category":null},{"type":"policy_question","topic":"horário","question":"Qual o horário de sábado?"}]}
+Preço, estoque ou disponibilidade de produto é sempre product_search, nunca policy_question.
+Use category somente quando o cliente disser o tipo de instrumento.
+
+Cliente: "Valeu, obrigado!"
+Saída: {"intents":[{"type":"small_talk","kind":"thanks"}]}
+Agradecimento, saudação ou despedida isolados nunca repetem uma busca anterior.
 
 Cliente: "Vocês vendem capas?"
 Saída: {"intents":[{"type":"out_of_scope","topic":"capas"}]}

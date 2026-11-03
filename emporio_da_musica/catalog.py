@@ -20,13 +20,30 @@ def normalize(text: str) -> str:
     )
 
 
+CATEGORY_IGNORED = "Requested name and category had no joint match; one was ignored."
+
+
 def search_catalog(snapshot: Snapshot, intent: ProductSearch) -> ProductSearchResult:
     """Return ordered choices, never implicitly select an ambiguous product.
 
     Missing quantity means an explicitly labeled unit-price catalog inquiry only.
     A budget limits the requested quantity's total, after rounding each unit.
+    A named product with a model-guessed category that matches nothing is searched
+    again by name only, and every resulting quote states that assumption.
     """
-    return _search(snapshot, intent)
+    result = _search(snapshot, intent)
+    if result.status != "not_found" or not intent.query or not intent.category:
+        return result
+    retry = _search(snapshot, intent.model_copy(update={"category": None}))
+    if retry.status != "success":
+        return result
+    products = tuple(
+        q.model_copy(update={"assumptions": (*q.assumptions, CATEGORY_IGNORED)})
+        for q in retry.data.products
+    )
+    return retry.model_copy(
+        update={"data": retry.data.model_copy(update={"products": products})}
+    )
 
 
 def quote_product(

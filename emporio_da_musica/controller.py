@@ -3,27 +3,39 @@
 import logging
 import re
 from dataclasses import dataclass
+from decimal import Decimal
 
 from pydantic import ValidationError
 
-from .catalog import quote_product, search_catalog
-from .composer import compose
+from .catalog import normalize, quote_product, search_catalog
+from .composer import BUDGET_IGNORED, compose
 from .contracts.common import MAX_MESSAGE_LENGTH
 from .contracts.dates import Clock, store_today
 from .contracts.intents import (
     ClarificationUpdate,
+    Complaint,
     OrderStatus,
+    OutOfScope,
     PaymentOptions,
+    PolicyQuestion,
     ProductSearch,
     ProposalError,
     RequestTooBroadError,
+    SmallTalk,
 )
 from .contracts.results import (
     RESULT_ADAPTER,
+    ComplaintData,
+    ComplaintResult,
     OperationResult,
     OrderData,
     OrderStatusResult,
+    OutOfScopeData,
+    OutOfScopeResult,
     PaymentOptionsResult,
+    PolicyQuestionResult,
+    SmallTalkData,
+    SmallTalkResult,
 )
 from .contracts.session import (
     ConversationMessage,
@@ -41,6 +53,12 @@ from .providers.base import (
     ProviderRequest,
 )
 from .providers.extraction import extract_proposal
+from .providers.policy import (
+    ContactConflict,
+    NotCovered,
+    PolicyAnswerError,
+    explain_policy,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -54,6 +72,31 @@ class TurnResponse:
 def _state(state, **changes):
     fields = {key: getattr(state, key) for key in type(state).model_fields}
     return SessionState(**(fields | changes))
+
+
+CONTACT_REQUEST = re.compile(
+    r"\b(telefone|fone|whats\w*|zap|e-?mail|contato|ligar|numero da loja)\b"
+)
+
+
+def _typed_amounts(message):
+    """Decimal amounts typed in a message: 1000, 1.000, 1.000,50, 1000.00, 2 mil."""
+    amounts = set()
+    for token, thousand in re.findall(
+        r"([0-9][0-9.,]*)(\s*mil\b)?", message, flags=re.IGNORECASE
+    ):
+        token = token.rstrip(".,")
+        if re.fullmatch(r"[0-9]{1,3}(\.[0-9]{3})+(,[0-9]{1,2})?", token):
+            token = token.replace(".", "").replace(",", ".")
+        elif re.fullmatch(r"[0-9]+,[0-9]{1,2}", token):
+            token = token.replace(",", ".")
+        elif not re.fullmatch(r"[0-9]+(\.[0-9]{1,2})?", token):
+            continue
+        value = Decimal(token)
+        amounts.add(value * 1000 if thousand else value)
+    if re.search(r"(?<![0-9\s])\s*\bmil\b", message, flags=re.IGNORECASE):
+        amounts.add(Decimal(1000))
+    return amounts
 
 
 def _result(operation, status, reason, missing=()):
@@ -82,6 +125,7 @@ class Controller:
         self.clock = clock
         self.session = create_session(snapshot, customer_id)
         self._typed_order_numbers = set()
+        self._message = ""
 
     def handle(self, message: str) -> TurnResponse:
         if (
@@ -157,6 +201,29 @@ class Controller:
         order_text = re.sub(r"R\$\s*[0-9.,]+|[0-9][0-9.]*,[0-9]{2}\b", " ", message)
         typed_numbers = {int(n) for n in re.findall(r"[0-9]+", order_text)}
         self._typed_order_numbers = typed_numbers
+        self._message = message
+        # Budgets and model-written search terms follow the same rule: values copied
+        # from history or invented by the model must not hide or replace products.
+        typed_amounts = _typed_amounts(message)
+        notes = []
+        checked = []
+        for intent in intents:
+            if isinstance(intent, ProductSearch):
+                if (
+                    intent.max_price_brl is not None
+                    and intent.max_price_brl not in typed_amounts
+                ):
+                    intent = intent.model_copy(update={"max_price_brl": None})
+                    notes.append(BUDGET_IGNORED)
+                if (
+                    intent.query
+                    and intent.category
+                    and normalize(intent.query) not in normalize(message)
+                ):
+                    # e.g. "viola" invented for "violões": keep the typed category.
+                    intent = intent.model_copy(update={"query": None})
+            checked.append(intent)
+        intents = checked
         intents = [
             intent.model_copy(update={"order_id": None})
             if isinstance(intent, OrderStatus)
@@ -246,7 +313,7 @@ class Controller:
             selected_order_id=selected_order,
             pending=tuple(pending),
         )
-        text = compose(results, displayed, pending)
+        text = compose(results, displayed, pending, notes=tuple(dict.fromkeys(notes)))
         return self._finish(message, text, tuple(results))
 
     def _finish(self, message, text, results=()):
@@ -257,7 +324,7 @@ class Controller:
         history_text = (
             text
             if len(text) <= MAX_MESSAGE_LENGTH
-            else "Resposta extensa de catálogo exibida; use os nomes e posições da lista atual."
+            else "Resposta extensa exibida; use os nomes e posições da lista atual."
         )
         self.session = self.session.append_message(
             ConversationMessage(role="assistant", content=history_text)
@@ -272,6 +339,15 @@ class Controller:
             return self._payment(intent, selected, original_display, pinned)
         if isinstance(intent, OrderStatus):
             return self._order(intent), None, None
+        if isinstance(intent, PolicyQuestion):
+            return self._policy(intent), None, None
+        if isinstance(intent, OutOfScope):
+            return OutOfScopeResult(status="success", data=OutOfScopeData()), None, None
+        if isinstance(intent, Complaint):
+            return ComplaintResult(status="success", data=ComplaintData()), None, None
+        if isinstance(intent, SmallTalk):
+            data = SmallTalkData(template=intent.kind or "greeting")
+            return SmallTalkResult(status="success", data=data), None, None
         return (
             _result(intent.type, "unavailable", "OPERATION_NOT_SUPPORTED"),
             None,
@@ -318,6 +394,34 @@ class Controller:
         if not changes:
             return intent
         return PaymentOptions.model_validate(intent.model_dump() | changes)
+
+    def _policy(self, intent):
+        if not hasattr(self.provider, "explain"):
+            return _result(intent.type, "unavailable", "POLICY_MODEL_UNAVAILABLE")
+        # Only text from the customer's current message is sent: the model-isolated
+        # question when it is literally part of that message, otherwise the whole
+        # message. History, identity, and facts from earlier turns are never sent.
+        question = self._message
+        if intent.question and normalize(intent.question).strip(" ?!.") in normalize(
+            self._message
+        ):
+            question = intent.question
+        if CONTACT_REQUEST.search(normalize(self._message)):
+            # The manual lists conflicting contacts; answer deterministically.
+            return _result(intent.type, "requires_confirmation", "CONTACT_CONFLICT")
+        try:
+            data = explain_policy(self.provider, question)
+        except NotCovered:
+            # Uncovered or unrelated questions get the fixed scope template.
+            return OutOfScopeResult(status="success", data=OutOfScopeData())
+        except ContactConflict:
+            return _result(intent.type, "requires_confirmation", "CONTACT_CONFLICT")
+        except (PolicyAnswerError, ProviderError) as error:
+            LOGGER.warning("Policy answer failed: %s", type(error).__name__)
+            return _result(intent.type, "error", "POLICY_ANSWER_FAILED")
+        return PolicyQuestionResult(
+            status="success", data=data, policy_references=data.policy_references
+        )
 
     def _order(self, intent):
         customer_id = self.session.simulated_customer_id

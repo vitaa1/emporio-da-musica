@@ -153,7 +153,7 @@ Milestone: M2. Suggested labels: `feature`, `domain`. Dependencies: P03, P07; re
 
 **Scope:** Query orders and items using the simulated authorized session; render status and available tracking/estimate data.
 
-Implemented on `feature/order-lookup`: `--customer-id` startup identity, Python-side authorization, nonrevealing not-found responses, deterministic rendering, `/pedido` demo command, and prompt examples. Order items are not rendered. A quote clarification fix keeps declared quantity when the model answers with a new turn. 231 offline tests pass. Reviewer and diagnosis findings (focus fallback, money amounts, same-turn carry-over, installments override, hidden pending operations) were fixed with regression tests. Catalog search now shows up to ten results (previously five). A six-turn live Qwen order evaluation passed after adding a current-message order-number guard; see OLLAMA_EVALUATION.md. Publication and remote CI are pending.
+Merged through PR #28 at `c62720b`; issue #12 is closed. Implemented: `--customer-id` startup identity, Python-side authorization, nonrevealing not-found responses, deterministic rendering, `/pedido` demo command, and prompt examples. Order items are not rendered. A quote clarification fix keeps declared quantity when the model answers with a new turn. 231 offline tests pass. Reviewer and diagnosis findings (focus fallback, money amounts, same-turn carry-over, installments override, hidden pending operations) were fixed with regression tests. Catalog search now shows up to ten results (previously five). A six-turn live Qwen order evaluation passed after adding a current-message order-number guard; see OLLAMA_EVALUATION.md.
 
 **Acceptance criteria**
 - [x] Customer identity is established outside model-controlled fields and clearly labeled as simulated.
@@ -193,6 +193,8 @@ Milestone: M3. Suggested labels: `feature`, `domain`. Dependencies: P03, P07, P0
 Milestone: M3. Suggested labels: `feature`, `evaluation`. Dependencies: P03, P08, P10, P11.
 
 **Scope:** Enable controller-selected general-policy prose, section references, out-of-scope redirection, small talk, and complaint acknowledgment. Keep critical data blocks in Python.
+
+Minimal slice implemented on `feature/policy-answers`: separate policy call with section validation, `covered` flag, contact-conflict guard, fixed out-of-scope/small-talk/complaint templates, extraction examples for these routes, and catalog fallbacks for observed category/budget extraction errors. Code, security, and bug-diagnosis reviews were run and their confirmed findings fixed (budget formats, invented search terms, uncovered answers, obfuscated contacts, unsupported numbers and action claims, answer size, question provenance, history summary). 278 offline tests pass; a twelve-message live Qwen policy/service sequence, the assignment catalog examples, and the existing catalog and order sequences passed. Return-related questions still depend on P11. Publication and remote CI are pending.
 
 **Acceptance criteria**
 - [ ] Policy-reference validation exists, with explicit acknowledgment that it does not prove semantic correctness.

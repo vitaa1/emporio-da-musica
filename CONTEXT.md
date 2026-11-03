@@ -23,7 +23,8 @@ This document preserves project context for continuing development with coding a
 - The official extraction prompt is versioned in `providers/prompts/extraction.md`. With the added contextual-reference examples, Qwen 3B passed the three-turn smoke sequence; Gemma 4B selected the wrong product on the quote step. This is a limited development evaluation, not a general reliability claim. The model default remains unchanged.
 - P08 (issue #11) was merged through PR #26 at `6858b10`; all three PR checks passed and issue #11 is closed. It uses Windows-hosted Ollama with the configurable default `qwen2.5:3b`. The local adapter, full manual context, natural-language CLI, offline transport tests, and opt-in evaluation exist; 209 offline tests pass. See `docs/OLLAMA_EVALUATION.md` for actual results and limitations. The remote `feature/ollama-integration` branch still exists; deleting it requires user authorization.
 - The package refactor merged through PR #25 at `e0a0aa7`.
-- P09 (issue #12), session-scoped order lookup, is implemented on `feature/order-lookup` (231 offline tests; live Qwen order sequence passed); publication and remote CI are pending. Next is a minimal P12 slice (general policy answers, out-of-scope, small talk) before P10/P11. See the revised order in `docs/GITHUB_PLAN.md`.
+- P09 (issue #12), session-scoped order lookup, merged through PR #28 at `c62720b`; M2 is complete.
+- A minimal P12 slice (policy answers, out-of-scope, small talk, complaints) is implemented on `feature/policy-answers` (278 offline tests; reviews applied; live Qwen sequences passed); publication and remote CI are pending. Next: P10/P11. See the revised order in `docs/GITHUB_PLAN.md`.
 
 - Setup issue #1 is complete. EditorConfig/Ruff issue #5 was merged through PR #6 at commit `74eb53c` and is closed.
 - Issue #3 (P02) covers contributor-workflow validation and documentation synchronization. It was merged through PR #13 at commit `0f7f59f`; issue #3 is closed.
