@@ -1,6 +1,6 @@
 # Empório da Música
 
-Last updated: 2026-11-03 (after the list-reference and PIX-evidence work).
+Last updated: 2026-11-03 (after P13 review, corrections, and live verification).
 
 This document preserves project context for continuing development with coding assistants (Codex CLI and, from 2026-11-03, Claude Code) in WSL. It is a handoff snapshot, not a claim about the current checkout or remote state. Check the actual files before making changes.
 
@@ -29,6 +29,12 @@ Windows-hosted Ollama is reachable from WSL at the Windows host address (`ip rou
 - Do not reuse or copy the Windows `.venv` into Linux. Create a separate Linux virtual environment in the intended WSL checkout after verifying its location and prerequisites. Preserve existing environments until their purpose is clear.
 
 ## Current project status
+
+- Local main includes PR #35 at `38acf3c`. P13 work is on `test/agent-evaluation`, uncommitted at this handoff: a versioned 12-scenario evaluator, preserved before/after runs, five real conversations, and a review report. See `docs/AGENT_EVALUATION.md`. All 489 offline tests and Ruff checks pass locally; remote CI for these changes has not run.
+- Review corrected quantity loss on recognized payment-only follow-ups, non-PIX methods copied without current-message evidence, warranty-only policy prose (now a fixed manual summary), and order-dependent evaluation matching. The final live run passed 29/29 automated checks and all seven marked manual reviews. A preceding run had one sanitized provider error whose underlying cause remains unverified; both runs are preserved. No prompts or dependencies changed.
+- The user authorized local Ollama evaluation and reported the submission deadline as 2026-11-04 23:59, aiming to submit that morning (working-environment local time assumed). Do not change the repository after the deadline. P14 remains next after P13 approval.
+
+Earlier status entries below are historical and may be superseded by the above.
 
 - The official extraction prompt is versioned in `providers/prompts/extraction.md`. With the added contextual-reference examples, Qwen 3B passed the three-turn smoke sequence; Gemma 4B selected the wrong product on the quote step. This is a limited development evaluation, not a general reliability claim. The model default remains unchanged.
 - P08 (issue #11) was merged through PR #26 at `6858b10`; all three PR checks passed and issue #11 is closed. It uses Windows-hosted Ollama with the configurable default `qwen2.5:3b`. See `docs/OLLAMA_EVALUATION.md` for actual results and limitations.

@@ -117,9 +117,9 @@ ACCESSORY_WORDS = re.compile(
 )
 
 QUOTES = (PaymentOptions, ShippingQuote)
-# Only PIX changes a price, so only PIX needs evidence in the current message; a
-# copied or misread PIX would apply an undeclared discount. Parsing Portuguese fully
-# is not attempted: any doubt (negation, another method) fails closed and asks.
+# Payment proposals need evidence in the current message. Python never chooses a
+# method from a keyword; it only rejects unsupported model proposals. PIX remains
+# stricter because it changes prices. Ambiguous negations ask for clarification.
 _COUNT = r"(?:[0-9]+|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze)"
 PAYMENT_MENTION = re.compile(
     r"\b(?:pix|cartao|debito|debit|credito|credit|boleto|dinheiro|parcel\w*|vezes|"
@@ -135,6 +135,42 @@ def pix_declared(message):
     """PIX named with no negation and no other payment term nearby in the message."""
     text = normalize(message)
     return re.search(r"\bpix\b", text) is not None and not _NOT_PIX.search(text)
+
+
+PAYMENT_EVIDENCE = {
+    "credit": re.compile(r"\b(?:credito|credit|cartao|parcel\w*|vezes|[0-9]+ ?x)\b"),
+    "debit": re.compile(r"\b(?:debito|debit|cartao)\b"),
+    "boleto": re.compile(r"\bboleto\b"),
+    "combined": re.compile(r"\b(?:combin\w*|meio a meio|dividi\w*)\b"),
+}
+NEGATED_PAYMENT = re.compile(r"\b(?:nao|nem|vez de|sem(?!\s+juros\b))\b")
+
+
+def payment_declared(method, message):
+    if method == "pix":
+        return pix_declared(message)
+    text = normalize(message)
+    return (
+        method in PAYMENT_EVIDENCE
+        and PAYMENT_EVIDENCE[method].search(text) is not None
+        and not NEGATED_PAYMENT.search(text)
+    )
+
+
+def payment_follow_up(message):
+    """Recognize a payment-only follow-up, never a new product or quantity."""
+    original = normalize(message)
+    text = re.sub(rf"\b{_COUNT}\s*(?:x|vezes|parcelas?)\b", " ", original)
+    return (
+        PAYMENT_MENTION.search(original) is not None
+        and re.fullmatch(
+            r"[\s?!.]*(?:(?:e|em|no|na|de|a|com|pelo|pela|via|quanto|fica|ficaria|"
+            r"seria|quero|pagar|pago|por|favor|pix|credito|credit|debito|debit|cartao|boleto|vista|prazo|sem|"
+            r"juros|parcelado)\b[\s?!.]*)+",
+            text,
+        )
+        is not None
+    )
 
 
 # A product reference made only of payment words ("débito", "no cartão") was
@@ -576,12 +612,12 @@ class Controller:
         return intent.model_copy(update=changes) if changes else intent
 
     def _typed_payment(self, intent, supplied):
-        """Drop a PIX, and thus its discount, not declared in this message."""
+        """Drop payment methods not supported by this message, without inferring one."""
         if (
             not isinstance(intent, (ProductSearch, *QUOTES))
-            or intent.payment_method != "pix"
+            or intent.payment_method is None
             or (supplied is not None and "payment_method" not in supplied)
-            or pix_declared(self._message)
+            or payment_declared(intent.payment_method, self._message)
         ):
             return intent
         return intent.model_copy(update={"payment_method": None, "installments": None})
@@ -712,7 +748,9 @@ class Controller:
         changes = {}
         if reference is None:
             changes["product_reference"] = {"kind": "selected"}
-        if intent.quantity is None and declared.quantity is not None:
+        if declared.quantity is not None and (
+            intent.quantity is None or payment_follow_up(self._message)
+        ):
             changes["quantity"] = declared.quantity
         if (
             intent.payment_method is None
