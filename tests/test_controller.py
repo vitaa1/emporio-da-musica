@@ -433,3 +433,29 @@ def test_model_invented_query_is_dropped_but_typed_query_kept(app):
     intent = {"type": "product_search", "query": "violino", "category": "Instrumentos"}
     response = turn(app, intent, message="tem violino?")
     assert response.results[0].status == "not_found"
+
+
+def test_unique_name_quote_is_shown_once(app):
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Piano"},
+            quantity=1,
+            payment_method="pix",
+        ),
+    )
+    assert response.text.count("Piano") == 1
+    assert "pagamento não informado" not in response.text
+
+
+def test_ambiguous_name_quote_still_lists_choices(app):
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "query", "query": "Violão"},
+            quantity=1,
+            payment_method="pix",
+        ),
+    )
+    assert "Violão A" in response.text and "Violão B" in response.text
+    assert response.results[-1].missing_fields == ("product_reference",)

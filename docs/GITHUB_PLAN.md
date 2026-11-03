@@ -201,12 +201,14 @@ Milestone: M3. Suggested labels: `feature`, `evaluation`. Dependencies: P03, P08
 Minimal slice implemented on `feature/policy-answers`: separate policy call with section validation, `covered` flag, contact-conflict guard, fixed out-of-scope/small-talk/complaint templates, extraction examples for these routes, and catalog fallbacks for observed category/budget extraction errors. Code, security, and bug-diagnosis reviews were run and their confirmed findings fixed (budget formats, invented search terms, uncovered answers, obfuscated contacts, unsupported numbers and action claims, answer size, question provenance, history summary). 278 offline tests pass; a twelve-message live Qwen policy/service sequence, the assignment catalog examples, and the existing catalog and order sequences passed. Return-related questions still depend on P11. Published as PR #29; issue #20 remains open for the remaining criteria.
 
 **Acceptance criteria**
-- [ ] Policy-reference validation exists, with explicit acknowledgment that it does not prove semantic correctness.
-- [ ] Individual policy decisions route to Python; free-form policy prose cannot bypass required assessment.
-- [ ] Accessory requests and unrelated topics are redirected appropriately.
-- [ ] Complaints receive empathy and an honest next step without false registration or transfer claims.
-- [ ] Known policy ambiguities and provider failures have stable fallbacks.
-- [ ] Mixed requests preserve independent answers and focused clarification.
+- [x] Policy-reference validation exists, with explicit acknowledgment that it does not prove semantic correctness.
+- [x] Individual policy decisions route to Python; free-form policy prose cannot bypass required assessment.
+- [x] Accessory requests and unrelated topics are redirected appropriately.
+- [x] Complaints receive empathy and an honest next step without false registration or transfer claims.
+- [x] Known policy ambiguities and provider failures have stable fallbacks.
+- [x] Mixed requests preserve independent answers and focused clarification.
+
+Completed on `feature/service-fallbacks`: separate accessory and unrelated-topic redirects chosen in Python, a single product line for unique name quotes, and documentation of the remaining criteria (section validation without semantic proof, individual cases routed to Python assessments, complaint template, stable fallbacks, independent answers in mixed requests).
 
 ## P13 — Evaluate the complete agent and extend CI
 
