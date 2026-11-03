@@ -24,15 +24,21 @@ ollama pull qwen2.5:3b
 .venv/bin/python -m emporio_da_musica.cli --customer-id 3
 ```
 
+On WSL with Ollama running on Windows, `localhost` does not reach the server: add the `--ollama-url` shown under [Configuration](#configuration). The agent warns at startup when it cannot reach the server or the model is not installed.
+
 Then try:
 
 ```text
-Mostre violões Yamaha
-Quero duas unidades do segundo no PIX
+Quero comprar um violão
+Yamaha
+Quero o segundo
+2 unidades no pix
 E em 10 vezes no crédito?
 Consulte meu pedido 1
 Qual o horário de sábado?
 ```
+
+A broad request gets a question about brand or budget. A list shows names and prices, and a chosen model shows its stock, unit price, and every payment option.
 
 ### Run without a model
 
@@ -128,6 +134,7 @@ General policy questions take a separate route: a second model call receives the
 | Session-only history | The challenge does not require persistence | Conversations are lost when the CLI closes |
 | `--customer-id` set outside the model | The model and the message text cannot change whose orders are visible | Demonstrates authorization, not real authentication |
 | `Decimal` for all money | Avoids floating-point errors at policy thresholds | None significant |
+| Guided purchase questions and payment options composed in Python | Customers get a conversation without letting the model state prices; the small model is not trusted for this text | Questions are templates, so the tone varies little |
 | Ask for confirmation when the manual is ambiguous | The challenge allows documented assumptions, and an invented commitment is worse than a clarification | Some answers defer to the store |
 
 ### Prompt and retrieval strategy
@@ -163,7 +170,7 @@ The manual is ambiguous or incomplete in several places. The prototype handles t
 .venv/bin/python -m ruff format --check .
 ```
 
-The 489 deterministic tests need no model or credentials. They run in CI on Linux, Windows, and macOS.
+The 535 deterministic tests need no model or credentials. They run in CI on Linux, Windows, and macOS.
 
 On 2026-11-03, a clean copy of this documentation's working tree was verified on WSL2 with Python 3.13 in a new virtual environment: installing the pins, the data validation, the offline commands, and the model example under Quick start all worked, as did the checks above. A single example run does not guarantee identical model output later.
 
@@ -173,10 +180,11 @@ Model behavior is evaluated separately, because it depends on a local server and
 .venv/bin/python -m evals.suite --url http://localhost:11434 --output /tmp/emporio-evaluation.json
 ```
 
-The latest recorded run passed 29 of 29 turns across 12 scenarios. The cases were informed by development, so this is a regression check rather than an independent accuracy measure. [The evaluation report](docs/AGENT_EVALUATION.md) keeps the earlier failing runs and their corrections, including one provider error whose cause was not determined.
+The latest recorded run passed 36 of 36 turns across 15 scenarios. The cases were informed by development, so this is a regression check rather than an independent accuracy measure. [The evaluation report](docs/AGENT_EVALUATION.md) keeps the earlier failing runs and their corrections, including one provider error whose cause was not determined.
 
 ## Known limitations
 
+- **Catalog browsing is basic.** Lists stop at ten items with no next page, and "preço mais baixo" is not sorted by price. Two filters in one message, such as two brands, are not combined. The guards that correct search terms cover the catalog's main instrument words, not every phrasing.
 - **Interpretation errors remain possible.** Quantity is not checked against arbitrary wording, generic "cartão" depends on the model, and negations may trigger an extra clarification.
 - **Policy prose is not proven correct.** Validators reject invented numbers, unknown sections, and claims of executed actions, but a misstated rule using valid numbers can pass. Only warranty-only answers use a fixed reviewed summary.
 - **No transactions.** There is no basket, purchase, refund, or human handoff. "Adicione" quotes only the named product, and complaints are acknowledged with a clear statement that nothing was registered.

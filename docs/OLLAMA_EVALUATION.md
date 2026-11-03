@@ -127,7 +127,7 @@ run had a sanitized provider error; its underlying cause remains unverified.
 The controller now retains quantity on recognized payment-only follow-ups and
 requires evidence for non-PIX methods too. Warranty-only policy answers use a
 fixed reviewed summary after validation. The evaluator matches overlapping
-expectations independently of response order. All 489 offline tests and Ruff
+expectations independently of response order. At that stage, all 489 offline tests and Ruff
 checks passed. No prompts, dependencies, or infrastructure changed. These small
 development-informed runs are not a general accuracy estimate; the report records
 remaining limitations and links five real conversation transcripts.

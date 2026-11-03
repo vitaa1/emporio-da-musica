@@ -116,6 +116,25 @@ def run_cli(controller, source, destination):
     destination.write("Até mais!\n")
 
 
+def startup_warning(provider, url):
+    """Describe a server problem found at startup; the session still opens."""
+    check = getattr(provider, "check_server", None)
+    problem = check() if check else None
+    if problem == "unreachable":
+        return (
+            f"Aviso: não consegui acessar o Ollama em {url}. Verifique se ele está em "
+            "execução ou informe o endereço com --ollama-url. No WSL com Ollama no "
+            'Windows, use --ollama-url "http://$(ip route | '
+            "awk '/default/{print $3}'):11434\"."
+        )
+    if problem == "model_missing":
+        return (
+            f"Aviso: o modelo {provider.model} não está instalado neste Ollama. "
+            f"Instale com: ollama pull {provider.model}"
+        )
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -168,6 +187,9 @@ def main():
         )
     except ValueError:
         parser.exit(1, "Unknown simulated customer.\n")
+    warning = startup_warning(provider, args.ollama_url)
+    if warning:
+        print(warning, file=sys.stderr)
     run_cli(controller, sys.stdin, sys.stdout)
 
 

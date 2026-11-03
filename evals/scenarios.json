@@ -491,5 +491,129 @@
         "manual_review": "Ask which payment method to use; do not silently retain credit or apply PIX."
       }
     ]
+  },
+  {
+    "id": "purchase-guidance",
+    "customer_id": null,
+    "origin": "manual testing feedback; guided purchase flow",
+    "turns": [
+      {
+        "message": "Quero comprar um violão",
+        "expected": [
+          {
+            "operation": "product_search",
+            "status": "success",
+            "data": {
+              "products": [],
+              "total_matches": 35
+            }
+          }
+        ],
+        "manual_review": "Asks for brand or budget; brands and price range match the catalog."
+      },
+      {
+        "message": "Yamaha",
+        "expected": [
+          {
+            "operation": "product_search",
+            "status": "success",
+            "data": {
+              "total_matches": 7
+            }
+          }
+        ],
+        "manual_review": null
+      },
+      {
+        "message": "Quero o segundo",
+        "expected": [
+          {
+            "operation": "payment_options",
+            "status": "needs_information"
+          }
+        ],
+        "optional_results": [
+          {
+            "operation": "product_search",
+            "status": "success",
+            "data": {
+              "products": [
+                {
+                  "product_id": 82
+                }
+              ],
+              "total_matches": 1
+            }
+          }
+        ],
+        "manual_review": "Shows C70 stock, unit price, and every payment option."
+      },
+      {
+        "message": "2 unidades no pix",
+        "expected": [
+          {
+            "operation": "payment_options",
+            "status": "success",
+            "data": {
+              "name": "Yamaha C70 Nylon Natural",
+              "quantity": 2,
+              "payment_method": "pix",
+              "final_total_brl": "1613.10"
+            }
+          }
+        ],
+        "manual_review": null
+      }
+    ]
+  },
+  {
+    "id": "budget-search",
+    "customer_id": null,
+    "origin": "challenge suggestion; manual testing feedback",
+    "turns": [
+      {
+        "message": "Quais opções de violões disponíveis custando até R$1000?",
+        "expected": [
+          {
+            "operation": "product_search",
+            "status": "success",
+            "data": {
+              "total_matches": 12
+            }
+          }
+        ],
+        "manual_review": null
+      },
+      {
+        "message": "quero um violão até 800",
+        "expected": [
+          {
+            "operation": "product_search",
+            "status": "success"
+          }
+        ],
+        "manual_review": null
+      }
+    ]
+  },
+  {
+    "id": "model-card",
+    "customer_id": null,
+    "origin": "challenge suggestion; manual testing feedback",
+    "turns": [
+      {
+        "message": "Quanto custa o Takamine GD20?",
+        "expected": [
+          {
+            "operation": "product_search",
+            "status": "success",
+            "data": {
+              "total_matches": 1
+            }
+          }
+        ],
+        "manual_review": "Payment options match the unit price; PIX is 5% lower."
+      }
+    ]
   }
 ]

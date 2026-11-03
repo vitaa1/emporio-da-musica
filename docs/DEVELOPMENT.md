@@ -46,7 +46,7 @@ Python must be 3.13.x and pip must belong to the project environment. The comman
 
 Run from the repository root. Loader tests use small synthetic CSVs in temporary directories; demo tests additionally validate the bundled snapshot and default command. Neither needs the challenge download nor provider credentials. They cover normalization, historical totals, duplicate keys, orphan references, malformed data, optional fields, and the validation command's output and error behavior.
 
-On 2026-11-03, at commit `b1bcde7`, all 489 tests passed locally with Python 3.13.18; CI on Windows, Linux, and macOS runs on each pull request. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed.
+On 2026-11-03, on the guided-conversation branch, all 535 tests passed locally with Python 3.13.18; CI on Windows, Linux, and macOS runs on each pull request. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed.
 
 ## Style and formatting
 

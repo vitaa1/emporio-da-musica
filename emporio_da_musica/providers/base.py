@@ -44,3 +44,7 @@ class PolicyProvider(Protocol):
 
 class ProviderError(RuntimeError):
     """Provider adapters translate connection/timeout failures to this exception."""
+
+
+class ProviderConnectionError(ProviderError):
+    """The model server could not be reached or did not answer in time."""

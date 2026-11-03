@@ -421,7 +421,7 @@ def test_typed_budget_formats_are_kept(app, message, budget):
 
 def test_dropped_budget_is_announced(app):
     intent = {"type": "product_search", "query": "Piano", "max_price_brl": "100"}
-    response = turn(app, intent, message="quanto custa o piano?")
+    response = turn(app, intent, message="piano até cem reais")
     assert response.results[0].status == "success"
     assert "limite de preço não foi reconhecido" in response.text
 
