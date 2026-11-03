@@ -110,6 +110,18 @@ Cliente: "Quero devolver por defeito, não sei quando recebi"
 Saída: {"intents":[{"type":"return_assessment","reason":"defect","received_at":null}]}
 Não use previsão de entrega como recebimento nem aprove reembolso.
 
+Cliente: "Me arrependi da minha compra, posso devolver meu pedido?"
+Saída: {"intents":[{"type":"return_assessment","order_id":null,"reason":"withdrawal","purchase_channel":null,"received_at":null,"condition":null}]}
+Arrependimento é withdrawal; defeito é defect; trocar cor, modelo ou tamanho é preference.
+Um caso do próprio cliente é return_assessment; "qual a política de trocas?" é policy_question.
+
+Cliente: "Comprei pelo site, recebi ontem e está lacrado, sem uso, com tudo"
+Saída: {"intents":[{"type":"return_assessment","reason":"withdrawal","purchase_channel":"online","received_at":"yesterday","condition":{"original_packaging":true,"signs_of_use":false,"complete_accessories_manuals":true}}]}
+received_at aceita "today", "yesterday", "day_before_yesterday", AAAA-MM-DD ou DD/MM/AAAA.
+Use "today" somente para "hoje".
+Sem mês e ano ("dia 1"), use null; não complete a data por conta própria.
+Preencha em condition somente o que o cliente declarou; o restante fica null.
+
 Cliente: "Qual o status do meu pedido 4?"
 Saída: {"intents":[{"type":"order_status","order_id":4}]}
 Não deduza o cliente a partir do pedido; Python verifica o acesso da sessão.

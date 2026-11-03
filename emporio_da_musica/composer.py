@@ -10,6 +10,7 @@ from .contracts.results import (
     OutOfScopeData,
     PolicyData,
     ProductQuote,
+    ReturnData,
     SmallTalkData,
 )
 
@@ -32,10 +33,15 @@ FIELDS = {
     "payment_method": "a forma de pagamento",
     "installments": "o número de parcelas",
     "order_id": "o número do pedido",
+    "reason": "o motivo: arrependimento de compra online, defeito de fabricação ou troca por preferência (cor, modelo, tamanho)",
+    "purchase_channel": "se a compra foi feita online ou na loja física",
+    "received_at": "a data em que você recebeu o produto (por exemplo, 01/11/2026, hoje ou ontem)",
+    "condition": "o estado do produto (se está na embalagem original, se tem sinais de uso, se tem todos os acessórios e manuais, se tem personalização ou ajuste sob encomenda e se foi comprado com aviso de venda final)",
 }
 OPERATIONS = {
     "order_status": "a consulta do pedido",
     "payment_options": "a cotação",
+    "return_assessment": "a avaliação de troca ou devolução",
 }
 TEMPLATES = {
     "greeting": "Olá! Que bom ter você por aqui no Empório da Música. Posso ajudar com instrumentos, preços, pedidos e políticas da loja.",
@@ -67,6 +73,45 @@ REASONS = {
     "ORDER_NOT_ACCESSIBLE": "Não encontrei esse pedido entre os pedidos do cliente desta sessão. Confira o número informado.",
 }
 
+
+RETURN_PROCESS = {
+    "withdrawal": "devolução por arrependimento",
+    "defect": "troca por defeito",
+    "preference": "troca por preferência",
+}
+RETURN_ASSESSMENT = {
+    "conditions_met": "Pelas informações disponíveis, as condições do manual para {process} estão atendidas.",
+    "conditions_not_met": "Pelas informações disponíveis, as condições do manual para {process} não estão atendidas.",
+    "requires_review": "Avaliação de {process}: alguns pontos ainda não estão confirmados.",
+}
+RETURN_CONDITIONS = {
+    "online_purchase": "compra feita online (o direito de arrependimento vale para compras online)",
+    "within_7_days_of_receipt": "até 7 dias corridos após o recebimento",
+    "order_delivered": "pedido registrado como entregue",
+    "receipt_after_order": "data de recebimento compatível com a data do pedido",
+    "original_packaging": "embalagem original",
+    "no_signs_of_use": "sem sinais de uso",
+    "complete_accessories_manuals": "todos os acessórios e manuais",
+    "not_customized": "sem personalização ou ajuste sob encomenda",
+    "not_final_sale": "sem aviso de venda final",
+    "within_30_days_of_purchase": "até 30 dias corridos após a compra",
+    "manufacturing_defect": "defeito de fabricação, sem danos por mau uso, queda, umidade ou modificação",
+    "preference_window": "prazo de 7 dias (o manual não define se conta da compra ou do recebimento)",
+    "desired_product_available": "disponibilidade do produto desejado",
+}
+CONDITION_STATES = {
+    "satisfied": "atendida",
+    "not_satisfied": "não atendida",
+    "unknown": "não informada",
+    "requires_review": "precisa de avaliação da loja",
+}
+PROVENANCE = {
+    "system_record": "registro do pedido",
+    "customer_declaration": "informado por você",
+    "policy": "manual da loja",
+    "unknown": "sem informação",
+}
+RETURN_FOOTER = "Avaliação preliminar com base no manual e nas informações disponíveis; nenhuma devolução, troca ou reembolso foi solicitado, aprovado ou realizado. Para dar andamento, procure a equipe da loja."
 
 BUDGET_IGNORED = "O limite de preço não foi reconhecido nesta mensagem e não foi aplicado; informe o valor em números (por exemplo, até R$ 1000)."
 CATALOG_FOOTER = "Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada."
@@ -122,6 +167,31 @@ def render_order(order: OrderData) -> str:
     return " ".join(lines)
 
 
+def render_return(data: ReturnData, references) -> str:
+    process = RETURN_PROCESS[data.reason]
+    lines = [RETURN_ASSESSMENT[data.assessment].format(process=process)]
+    for condition in data.conditions:
+        lines.append(
+            f"- {RETURN_CONDITIONS[condition.name]}: "
+            f"{CONDITION_STATES[condition.state]} ({PROVENANCE[condition.provenance]})."
+        )
+    names = {c.name: c.state for c in data.conditions}
+    if names.get("online_purchase") == "not_satisfied":
+        lines.append(
+            "Compras na loja física podem ser avaliadas como troca por defeito ou por preferência."
+        )
+    if data.reason == "withdrawal" and data.assessment != "conditions_not_met":
+        lines.append(
+            "Pelo manual, o reembolso é feito na mesma forma de pagamento original em até 10 dias úteis, e o frete de devolução fica por conta da loja."
+        )
+    if names.get("within_30_days_of_purchase") == "not_satisfied":
+        lines.append(
+            "Depois de 30 dias, o defeito é tratado pela garantia do fabricante; a loja pode intermediar o processo mediante solicitação."
+        )
+    lines.append(f"(Manual da loja, seção {', '.join(references)}.)")
+    return "\n".join(lines)
+
+
 def compose(results, displayed_ids: tuple[int, ...], pending, notes=()) -> str:
     completed, limitations, footers = [], [], []
     for result in results:
@@ -148,6 +218,9 @@ def compose(results, displayed_ids: tuple[int, ...], pending, notes=()) -> str:
             elif isinstance(result.data, OrderData):
                 completed.append(render_order(result.data))
                 footers.append(ORDER_FOOTER)
+            elif isinstance(result.data, ReturnData):
+                completed.append(render_return(result.data, result.policy_references))
+                footers.append(RETURN_FOOTER)
             elif isinstance(result.data, PolicyData):
                 sections = ", ".join(result.data.policy_references)
                 completed.append(

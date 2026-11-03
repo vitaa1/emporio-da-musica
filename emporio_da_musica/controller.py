@@ -14,6 +14,7 @@ from .contracts.dates import Clock, store_today
 from .contracts.intents import (
     ClarificationUpdate,
     Complaint,
+    IntentTurn,
     OrderStatus,
     OutOfScope,
     PaymentOptions,
@@ -21,6 +22,7 @@ from .contracts.intents import (
     ProductSearch,
     ProposalError,
     RequestTooBroadError,
+    ReturnAssessment,
     SmallTalk,
 )
 from .contracts.results import (
@@ -34,6 +36,7 @@ from .contracts.results import (
     OutOfScopeResult,
     PaymentOptionsResult,
     PolicyQuestionResult,
+    ReturnAssessmentResult,
     SmallTalkData,
     SmallTalkResult,
 )
@@ -59,6 +62,7 @@ from .providers.policy import (
     PolicyAnswerError,
     explain_policy,
 )
+from .returns import REFERENCES, assess_return, required_fields
 
 LOGGER = logging.getLogger(__name__)
 
@@ -73,6 +77,18 @@ def _state(state, **changes):
     fields = {key: getattr(state, key) for key in type(state).model_fields}
     return SessionState(**(fields | changes))
 
+
+RECEIPT_WORDS = re.compile(r"\b(hoje|ontem|anteontem)\b")
+MONTHS = (
+    "janeiro|fevereiro|marco|março|abril|maio|junho|julho|agosto|setembro|"
+    "outubro|novembro|dezembro"
+)
+# Dates are not order numbers: "recebi dia 5", "05/11", "5 de novembro".
+DATE_TEXT = re.compile(
+    r"\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b|\b[0-9]{1,2}/[0-9]{1,2}(?:/[0-9]{2,4})?\b"
+    rf"|\bdia\s+[0-9]{{1,2}}\b|\b[0-9]{{1,2}}\s+de\s+(?:{MONTHS})\b",
+    re.IGNORECASE,
+)
 
 CONTACT_REQUEST = re.compile(
     r"\b(telefone|fone|whats\w*|zap|e-?mail|contato|ligar|numero da loja)\b"
@@ -168,6 +184,7 @@ class Controller:
             )
 
         prior = None
+        kept = []
         if isinstance(proposal, ClarificationUpdate):
             prior = next(
                 (
@@ -182,10 +199,23 @@ class Controller:
                     raise ValueError("Unknown pending operation")
                 declarations, _, _ = prior.apply_update(proposal, clock=self.clock)
             except ValueError:
-                return self._finish(
-                    message,
-                    "Não consegui aplicar essa correção. Responda aos dados solicitados ou use /cancelar.",
-                )
+                if not (
+                    prior
+                    and isinstance(prior.declarations.intent, ReturnAssessment)
+                    and isinstance(proposal.update, ReturnAssessment)
+                ):
+                    return self._finish(
+                        message,
+                        "Não consegui aplicar essa correção. Responda aos dados solicitados ou use /cancelar.",
+                    )
+                # Return facts are often answered together ("online, recebi
+                # ontem"); treat the update as a new turn merged with the pending
+                # declarations instead of rejecting the extra facts.
+                proposal = IntentTurn(intents=[proposal.update])
+                # Other pending operations were not addressed and stay waiting.
+                kept = [p for p in self.session.pending if p is not prior]
+                prior = None
+        if prior is not None:
             intents = [declarations.intent]
             pending = list(self.session.pending)
             pending.remove(prior)
@@ -193,12 +223,13 @@ class Controller:
             # A new complete turn replaces prior unfinished requests. Updates target
             # existing pending work explicitly; neither form can change identity.
             intents = proposal.intents
-            pending = []
+            pending = kept
 
         # A model may copy an order number from history; only ASCII digits typed in
         # the current message, excluding money amounts, can identify an order. This
         # is an extraction-quality filter; authorization is enforced in _order.
         order_text = re.sub(r"R\$\s*[0-9.,]+|[0-9][0-9.]*,[0-9]{2}\b", " ", message)
+        order_text = DATE_TEXT.sub(" ", order_text)
         typed_numbers = {int(n) for n in re.findall(r"[0-9]+", order_text)}
         self._typed_order_numbers = typed_numbers
         self._message = message
@@ -224,12 +255,11 @@ class Controller:
                     intent = intent.model_copy(update={"query": None})
             checked.append(intent)
         intents = checked
+        # Facts carried in a merged clarification were checked when first supplied;
+        # only values supplied by this proposal must appear in this message.
+        supplied = proposal.update.model_fields_set if prior else None
         intents = [
-            intent.model_copy(update={"order_id": None})
-            if isinstance(intent, OrderStatus)
-            and intent.order_id not in typed_numbers | {None}
-            else intent
-            for intent in intents
+            self._typed_facts(intent, supplied, typed_numbers) for intent in intents
         ]
         results = []
         shown = []
@@ -339,6 +369,8 @@ class Controller:
             return self._payment(intent, selected, original_display, pinned)
         if isinstance(intent, OrderStatus):
             return self._order(intent), None, None
+        if isinstance(intent, ReturnAssessment):
+            return self._return(intent), None, None
         if isinstance(intent, PolicyQuestion):
             return self._policy(intent), None, None
         if isinstance(intent, OutOfScope):
@@ -354,6 +386,61 @@ class Controller:
             None,
         )
 
+    def _typed_facts(self, intent, supplied, typed_numbers):
+        """Drop order numbers and receipt dates the customer did not type now."""
+        if not isinstance(intent, (OrderStatus, ReturnAssessment)):
+            return intent
+        changes = {}
+        if (
+            (supplied is None or "order_id" in supplied)
+            and intent.order_id is not None
+            and intent.order_id not in typed_numbers
+        ):
+            changes["order_id"] = None
+        if (
+            isinstance(intent, ReturnAssessment)
+            and (supplied is None or "received_at" in supplied)
+            and intent.received_at is not None
+            # The resolved day must be typed now (e.g. "dia 5", "05/11") unless a
+            # relative word was used; any unrelated digit is not enough.
+            and intent.received_at.day
+            not in {int(n) for n in re.findall(r"[0-9]+", self._message)}
+            and not RECEIPT_WORDS.search(normalize(self._message))
+        ):
+            changes["received_at"] = None
+        return intent.model_copy(update=changes) if changes else intent
+
+    def _carry_return(self, intent):
+        """Reuse facts declared for a pending return answered as a new turn."""
+        prior = next(
+            (
+                p.declarations.intent
+                for p in self.session.pending
+                if isinstance(p.declarations.intent, ReturnAssessment)
+                and intent.reason in (None, p.declarations.intent.reason)
+                # Facts declared about one order never transfer to another.
+                and intent.order_id in (None, p.declarations.intent.order_id)
+            ),
+            None,
+        )
+        if prior is None:
+            return intent
+        merged = prior.model_dump(mode="json")
+        for name, value in intent.model_dump(mode="json").items():
+            if name == "condition" and value and merged.get("condition"):
+                merged["condition"] = merged["condition"] | {
+                    k: v for k, v in value.items() if v is not None
+                }
+            elif value is not None:
+                merged[name] = value
+        try:
+            return ReturnAssessment.model_validate(
+                merged, context={"today": store_today(self.clock)}
+            )
+        except ValidationError:
+            # Carried facts that no longer validate are dropped, not raised.
+            return intent
+
     def _carry_over(self, intent, selected):
         """Keep facts already declared for the same pending quote.
 
@@ -361,6 +448,8 @@ class Controller:
         selected product instead of a pending update. Only facts the customer already
         declared for that same resolved product are reused; nothing is invented.
         """
+        if isinstance(intent, ReturnAssessment):
+            return self._carry_return(intent)
         if not isinstance(intent, PaymentOptions):
             return intent
         reference = intent.product_reference
@@ -422,6 +511,31 @@ class Controller:
         return PolicyQuestionResult(
             status="success", data=data, policy_references=data.policy_references
         )
+
+    def _return(self, intent):
+        if intent.order_id is None and not self._typed_order_numbers:
+            # Same focus rule as order lookup; only an authorized lookup sets it.
+            focus = self.session.selected_order_id
+            if focus is not None:
+                intent = intent.model_copy(update={"order_id": focus})
+        missing = required_fields(intent)
+        if missing:
+            reason = intent.reason
+            return ReturnAssessmentResult(
+                status="needs_information",
+                reason_code="RETURN_FACTS_MISSING",
+                missing_fields=missing,
+                policy_references=(("4",) if reason is None else REFERENCES[reason]),
+            )
+        order = None
+        if intent.order_id is not None:
+            customer_id = self.session.simulated_customer_id
+            if customer_id is None:
+                return _result(intent.type, "unauthorized", "ORDER_ACCESS_DENIED")
+            order = self.snapshot.orders.get(intent.order_id)
+            if order is None or order.customer_id != customer_id:
+                return _result(intent.type, "not_found", "ORDER_NOT_ACCESSIBLE")
+        return assess_return(intent, order, store_today(self.clock))
 
     def _order(self, intent):
         customer_id = self.session.simulated_customer_id

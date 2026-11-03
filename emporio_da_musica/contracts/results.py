@@ -60,6 +60,7 @@ class AssessedCondition(Contract):
 
 
 class ReturnData(Contract):
+    reason: Literal["withdrawal", "defect", "preference"]
     assessment: Literal["conditions_met", "conditions_not_met", "requires_review"]
     conditions: tuple[AssessedCondition, ...]
 

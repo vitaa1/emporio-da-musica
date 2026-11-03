@@ -178,6 +178,7 @@ def test_combined_payment_and_missing_condition_booleans():
     "raw,expected",
     [
         ("2026-11-01", date(2026, 11, 1)),
+        ("01/11/2026", date(2026, 11, 1)),
         ("today", date(2026, 11, 1)),
         ("yesterday", date(2026, 10, 31)),
         ("day_before_yesterday", date(2026, 10, 30)),
@@ -189,7 +190,8 @@ def test_receipt_date_resolution_uses_store_day(raw, expected):
 
 
 @pytest.mark.parametrize(
-    "raw", ["2026-11-02", "next Monday", "01/11/2026", "2026-02-30", 0]
+    "raw",
+    ["2026-11-02", "02/11/2026", "next Monday", "01/11", "31/02/2026", "2026-02-30", 0],
 )
 def test_invalid_or_future_receipt_date(raw):
     with pytest.raises(ProposalError):
