@@ -2,14 +2,14 @@
 
 ## Architecture planning
 
-The development environment, in-memory CSV loader, typed agent/controller contracts, catalog search/pricing, and an offline catalog controller/CLI are implemented. Local Ollama model integration is implemented; live quality findings are documented below. The planned solution is a Python CLI with LLM intent extraction, a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results.
+The agent is a Python CLI with local LLM intent extraction (Ollama), a Python controller, in-memory CSV queries, deterministic business rules, and direct composition of critical results. Implemented: catalog search and prices, credit installments, local freight, session-scoped order lookup, return and exchange assessments, general policy answers, and out-of-scope, small-talk, and complaint messages. Live quality findings are documented in `docs/OLLAMA_EVALUATION.md`. Consolidated evaluation, interaction examples, and the final submission README remain (P13, P14).
 
 - [Architecture, scope, and policy decisions](docs/ARCHITECTURE.md)
 - [Agent–controller contract](docs/CONTRACT.md)
 - [GitHub milestones and ready-to-copy issues](docs/GITHUB_PLAN.md)
 - [Project handoff and source analysis](CONTEXT.md)
 
-These documents distinguish implemented data loading from planned conversational behavior. Contract schemas, limits, and offline catalog execution are implemented; real-model interpretation remains planned. Architecture now records P03 policy decisions and explicit deferrals; these were checked against the supplied manual, with catalog availability and nonstacking price rules now implemented.
+These documents record the architecture, the P03 policy decisions and explicit deferrals (checked against the supplied manual), the implemented contracts, and the milestone plan. Model interpretation is evaluated separately from deterministic tests.
 
 ## Package organization
 
@@ -20,13 +20,14 @@ These documents distinguish implemented data loading from planned conversational
 - `providers/demo.py`: command-based demonstration adapter used for offline runs (`/buscar`, `/preco`, `/pedido`).
 - `providers/ollama.py`: local Ollama adapter (P08); see the Ollama section below.
 - `contracts/`: typed intents, results, dates, and session state.
-- `controller.py`, `catalog.py`, `composer.py`, and `cli.py`: orchestration, business queries, response rendering, and terminal interaction respectively.
+- `providers/policy.py` and `providers/prompts/`: policy-answer validation and the versioned extraction and policy prompts.
+- `controller.py`, `catalog.py`, `returns.py`, `composer.py`, and `cli.py`: orchestration, catalog/price/installment rules, return assessments, response rendering, and terminal interaction respectively.
 
 Imports target these modules explicitly; package initializers do not eagerly import adapters or loaders. The CLI owns demo usage guidance and constructs the provider. The controller depends on the provider protocol and extraction function. Domain/session code imports snapshot types from `data.records`, without importing the CSV loader.
 
 The package reorganization changes Python import paths: use `data.loader` for `load_snapshot`/`DataError`, `data.records` for record types, and `providers.base`/`providers.extraction` for the former provider module. `DemoProvider` belongs to `providers.demo`. Both documented CLI commands retain their behavior and paths.
 
-Tests separate controller behavior (`test_controller.py`), terminal interaction (`test_cli.py`), and rendering (`test_composer.py`). Shared synthetic setup is in `conftest.py` and conversation builders are in `support.py`. Existing assertions and parameterized cases are preserved; this refactor adds no runtime dependency or application capability.
+Tests separate controller behavior (`test_controller.py`), terminal interaction (`test_cli.py`), rendering (`test_composer.py`), and per-feature rules (`test_catalog.py`, `test_orders.py`, `test_policy.py`, `test_returns.py`, `test_shipping.py`). Shared synthetic setup is in `conftest.py` and conversation builders are in `support.py`. Existing assertions and parameterized cases are preserved; this refactor adds no runtime dependency or application capability.
 
 ## Validate the supplied data (P04)
 
@@ -221,7 +222,7 @@ Python must be 3.13.x and pip must belong to the project environment. The comman
 
 Run from the repository root. Loader tests use small synthetic CSVs in temporary directories; demo tests additionally validate the bundled snapshot and default command. Neither needs the challenge download nor provider credentials. They cover normalization, historical totals, duplicate keys, orphan references, malformed data, optional fields, and the validation command's output and error behavior.
 
-On 2026-11-03, all 209 tests passed locally with Python 3.13.18 and pytest 9.2.0, including loader, bundled demo, contract, 32 catalog tests, 39 controller/CLI tests, and 17 Ollama adapter tests. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed. The updated CI runs these tests on all three platforms; remote results remain pending until this branch is published.
+On 2026-11-03, after PR #33, all 415 tests passed locally with Python 3.13.18 and pytest 9.2.0, and in CI on Windows, Linux, and macOS. The original six-table snapshot also loaded successfully with the counts listed above. Ruff and `pip check` passed.
 
 ### Style and formatting
 

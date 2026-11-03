@@ -81,3 +81,31 @@ On 2026-11-03, `qwen2.5:3b` was run without a simulated customer on twelve messa
 The assignment's catalog examples then exposed two further extraction errors. "Violões até R$1000" produced `query: "viola"` with category `Violões`, and a following price question inherited the `R$ 1000` budget from history. Python now retries by category when the query shares the category stem and drops budgets absent from the current message. The final run routed all twelve messages as intended; the phone question returned the contact-conflict message, the regret return reported the unavailable P11 operation, and both assignment catalog examples succeeded. The catalog and order sequences above passed again. Policy prose was read manually: answers matched the manual sections cited, though the payment answer did not mention the installment bands. These single development runs informed the fixes and are not an independent accuracy estimate.
 
 After code, security, and diagnosis reviews, the policy guards were tightened (contact obfuscation, manual-only numbers, executed-action claims, 1,000-character limit, current-message question). The first rerun exposed two regressions: the phone question returned `covered=false` (out-of-scope template), and the mixed price-plus-hours message lost its policy answer because the full message was sent. Contact requests are now answered deterministically, and the model-isolated question is used when it appears literally in the current message. The final rerun passed all twelve messages, both assignment catalog examples, and the catalog and order sequences.
+
+## Return assessments (P11)
+
+On 2026-11-03, `qwen2.5:3b` with simulated customer 3 handled a six-message return sequence: the assignment regret example, purchase channel and receipt date, product condition, a general defect-policy question, a defect case for order 1, and a preference exchange. Extraction routed each message as intended, the general question stayed a policy answer, and order 1 (from 2025) was reported outside the 30-day defect window with the manufacturer-warranty note. After reviews, a rerun showed that the model does not know the current date: it turned "recebi dia 1" into `today`, which the Python receipt filter discarded, and it then copied `01/11/2026` literally. Python now accepts `DD/MM/YYYY` receipt dates, and the clarification prompt shows that format; the rerun completed the withdrawal and defect cases.
+
+## Store address (address fix)
+
+Checking the four assignment examples exposed that "Qual o endereço da loja?" was extracted correctly as `policy_question` but the policy call returned `covered=false`, so the out-of-scope template was shown; "Onde fica a loja?" was answered correctly. The fixed §1.2 text is now a fallback only for whole-question store-address requests. In the final live run the model answered the address itself, so the fallback was not exercised live; it is covered offline.
+
+## Installments and local freight (P10)
+
+Live runs covered a Takamine GD20 price, 10 credit installments (R$ 219,90 each), local free freight with PIX (subtotal R$ 2.089,05), Dourados/MS (region confirmation), a follow-up "E qual o frete dele…" reusing the completed PIX quote, and a reset after `/cancelar`. Without history, three freight phrasings were extracted correctly as `shipping_quote` in two runs each; the model also filled `state: "MS"` when only "Campo Grande" was typed.
+
+## Service messages (P12 completion)
+
+An eight-message run (greeting, strings, case for a guitar, a 2002 World Cup question, a PIX quote, a delay complaint, Saturday hours plus a Yamaha C40 price, thanks) produced the intended routes and templates; "violão de 7 cordas" became a product search rather than an accessory redirect.
+
+## Observed misinterpretations to evaluate (P13 input)
+
+These single development runs are not accuracy estimates. Python guards prevented wrong facts in each case, but the customer received an incomplete or misrouted answer:
+
+- With conversation history, a freight request ("Quero o Yamaha C40, uma unidade no boleto, qual o frete para Campo Grande?") was extracted as `payment_options`, so no freight was quoted; the same message without history was extracted correctly.
+- "Quero o Violão Inexistente XYZ, qual o frete?" was routed to `out_of_scope` instead of a quote that reports no match.
+- "Mostre violões Yamaha no cartão" omitted `payment_method: credit`.
+- "Posso trocar por e-mail? Qual o prazo de troca por defeito?" was routed to an individual defect `return_assessment`, which asked for an order number.
+- "O Yamaha C40 tem estoque? E vai chover amanhã?" dropped the product search and returned only the general redirect.
+- In an address-plus-hours answer, the policy model cited only §1.2, not §2.
+- Relative receipt dates without month and year cannot be resolved by the model, which has no current date.
