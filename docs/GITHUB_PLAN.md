@@ -153,12 +153,14 @@ Milestone: M2. Suggested labels: `feature`, `domain`. Dependencies: P03, P07; re
 
 **Scope:** Query orders and items using the simulated authorized session; render status and available tracking/estimate data.
 
+Implemented on `feature/order-lookup`: `--customer-id` startup identity, Python-side authorization, nonrevealing not-found responses, deterministic rendering, `/pedido` demo command, and prompt examples. Order items are not rendered. A quote clarification fix keeps declared quantity when the model answers with a new turn. 231 offline tests pass. Reviewer and diagnosis findings (focus fallback, money amounts, same-turn carry-over, installments override, hidden pending operations) were fixed with regression tests. Catalog search now shows up to ten results (previously five). A six-turn live Qwen order evaluation passed after adding a current-message order-number guard; see OLLAMA_EVALUATION.md. Publication and remote CI are pending.
+
 **Acceptance criteria**
-- [ ] Customer identity is established outside model-controlled fields and clearly labeled as simulated.
-- [ ] Foreign order access is blocked without leaking order existence or personal data.
-- [ ] Historical totals are preserved; missing tracking/estimate fields are not fabricated.
-- [ ] Estimates are labeled as estimates and never treated as actual receipt dates.
-- [ ] Tests cover accessible, inaccessible, nonexistent, and incomplete orders.
+- [x] Customer identity is established outside model-controlled fields and clearly labeled as simulated.
+- [x] Foreign order access is blocked without leaking order existence or personal data.
+- [x] Historical totals are preserved; missing tracking/estimate fields are not fabricated.
+- [x] Estimates are labeled as estimates and never treated as actual receipt dates.
+- [x] Tests cover accessible, inaccessible, nonexistent, and incomplete orders.
 
 ## P10 — Add payment options and supported freight calculations
 

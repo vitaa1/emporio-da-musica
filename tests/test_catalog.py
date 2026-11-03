@@ -47,7 +47,9 @@ def search(snapshot, **kwargs):
     return search_catalog(snapshot, ProductSearch(type="product_search", **kwargs))
 
 
-def test_normalization_order_bound_and_no_matches(snapshot):
+def test_normalization_order_bound_and_no_matches(snapshot, monkeypatch):
+    # A smaller bound exercises truncation with the seven-product fixture.
+    monkeypatch.setattr("emporio_da_musica.catalog.MAX_CATALOG_RESULTS", 5)
     snapshot.products = dict(reversed(list(snapshot.products.items())))
     result = search(snapshot, query="  VIOLA\u0303O  MODELO ", category="ACUSTICAS")
     assert [p.product_id for p in result.data.products] == [1, 2, 3, 4, 5]
@@ -216,3 +218,14 @@ def test_credit_installment_band_states(snapshot, installments):
         else:
             assert result.status == "unavailable"
             assert result.reason_code == "INSTALLMENT_QUOTE_NOT_SUPPORTED"
+
+
+def test_default_bound_shows_all_bundled_yamaha_guitars():
+    from pathlib import Path
+
+    from emporio_da_musica.data.loader import load_snapshot
+
+    bundled = load_snapshot(Path(__file__).resolve().parents[1] / "data/demo")
+    result = search(bundled, query="Yamaha", category="Violões")
+    assert result.data.total_matches == 7
+    assert len(result.data.products) == 7

@@ -106,6 +106,14 @@ Cliente: "Quero devolver por defeito, não sei quando recebi"
 Saída: {"intents":[{"type":"return_assessment","reason":"defect","received_at":null}]}
 Não use previsão de entrega como recebimento nem aprove reembolso.
 
+Cliente: "Qual o status do meu pedido 4?"
+Saída: {"intents":[{"type":"order_status","order_id":4}]}
+Não deduza o cliente a partir do pedido; Python verifica o acesso da sessão.
+
+Cliente: "E o rastreio dele?" (após uma consulta de pedido)
+Saída: {"intents":[{"type":"order_status","order_id":null}]}
+Não repita um número de pedido que o cliente não informou nesta mensagem.
+
 Cliente: "Vocês vendem capas?"
 Saída: {"intents":[{"type":"out_of_scope","topic":"capas"}]}
 O controlador cuida da orientação ao cliente.

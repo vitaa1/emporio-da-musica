@@ -1,6 +1,7 @@
 """Sequential catalog controller; provider proposals never own execution state."""
 
 import logging
+import re
 from dataclasses import dataclass
 
 from pydantic import ValidationError
@@ -11,6 +12,7 @@ from .contracts.common import MAX_MESSAGE_LENGTH
 from .contracts.dates import Clock, store_today
 from .contracts.intents import (
     ClarificationUpdate,
+    OrderStatus,
     PaymentOptions,
     ProductSearch,
     ProposalError,
@@ -19,6 +21,8 @@ from .contracts.intents import (
 from .contracts.results import (
     RESULT_ADAPTER,
     OperationResult,
+    OrderData,
+    OrderStatusResult,
     PaymentOptionsResult,
 )
 from .contracts.session import (
@@ -77,6 +81,7 @@ class Controller:
         self.provider = provider
         self.clock = clock
         self.session = create_session(snapshot, customer_id)
+        self._typed_order_numbers = set()
 
     def handle(self, message: str) -> TurnResponse:
         if (
@@ -146,12 +151,30 @@ class Controller:
             intents = proposal.intents
             pending = []
 
+        # A model may copy an order number from history; only ASCII digits typed in
+        # the current message, excluding money amounts, can identify an order. This
+        # is an extraction-quality filter; authorization is enforced in _order.
+        order_text = re.sub(r"R\$\s*[0-9.,]+|[0-9][0-9.]*,[0-9]{2}\b", " ", message)
+        typed_numbers = {int(n) for n in re.findall(r"[0-9]+", order_text)}
+        self._typed_order_numbers = typed_numbers
+        intents = [
+            intent.model_copy(update={"order_id": None})
+            if isinstance(intent, OrderStatus)
+            and intent.order_id not in typed_numbers | {None}
+            else intent
+            for intent in intents
+        ]
         results = []
         shown = []
         selected = self.session.selected_product_id
+        selected_order = self.session.selected_order_id
         original_display = self.session.displayed_product_ids
         for intent in intents:
             pinned = None
+            if prior is None:
+                # Uses the selection current at this point of the turn, so a search
+                # earlier in the same turn prevents inheriting another product's facts.
+                intent = self._carry_over(intent, selected)
             execution_intent = intent
             if prior and isinstance(intent, PaymentOptions):
                 if "product_reference" not in proposal.update.model_fields_set:
@@ -192,6 +215,11 @@ class Controller:
             ):
                 if outcome.data.product_id not in shown:
                     shown.append(outcome.data.product_id)
+            if isinstance(outcome, OrderStatusResult):
+                # Only a successful, authorized lookup may become the order in focus.
+                selected_order = (
+                    outcome.data.order_id if outcome.status == "success" else None
+                )
             results.append(outcome)
             if outcome.status == "needs_information":
                 fields = dict(
@@ -215,6 +243,7 @@ class Controller:
             self.session,
             displayed_product_ids=displayed,
             selected_product_id=selected,
+            selected_order_id=selected_order,
             pending=tuple(pending),
         )
         text = compose(results, displayed, pending)
@@ -241,16 +270,82 @@ class Controller:
             return result, result if result.status == "success" else None, None
         if isinstance(intent, PaymentOptions):
             return self._payment(intent, selected, original_display, pinned)
-        if intent.type == "order_status" and self.session.simulated_customer_id is None:
-            return (
-                _result(intent.type, "unauthorized", "ORDER_ACCESS_DENIED"),
-                None,
-                None,
-            )
+        if isinstance(intent, OrderStatus):
+            return self._order(intent), None, None
         return (
             _result(intent.type, "unavailable", "OPERATION_NOT_SUPPORTED"),
             None,
             None,
+        )
+
+    def _carry_over(self, intent, selected):
+        """Keep facts already declared for the same pending quote.
+
+        Small models often answer a clarification ("no PIX") with a new quote for the
+        selected product instead of a pending update. Only facts the customer already
+        declared for that same resolved product are reused; nothing is invented.
+        """
+        if not isinstance(intent, PaymentOptions):
+            return intent
+        reference = intent.product_reference
+        if reference is not None and reference.kind != "selected":
+            return intent
+        prior = next(
+            (
+                p
+                for p in self.session.pending
+                if isinstance(p.declarations.intent, PaymentOptions)
+                and p.records.product_id is not None
+                and p.records.product_id == selected
+            ),
+            None,
+        )
+        if prior is None:
+            return intent
+        declared = prior.declarations.intent
+        changes = {}
+        if reference is None:
+            changes["product_reference"] = {"kind": "selected"}
+        if intent.quantity is None and declared.quantity is not None:
+            changes["quantity"] = declared.quantity
+        if (
+            intent.payment_method is None
+            and intent.installments is None
+            and declared.payment_method is not None
+        ):
+            changes["payment_method"] = declared.payment_method
+            changes["installments"] = declared.installments
+        if not changes:
+            return intent
+        return PaymentOptions.model_validate(intent.model_dump() | changes)
+
+    def _order(self, intent):
+        customer_id = self.session.simulated_customer_id
+        if customer_id is None:
+            # Without a startup identity, no order record is consulted at all.
+            return _result(intent.type, "unauthorized", "ORDER_ACCESS_DENIED")
+        order_id = intent.order_id
+        if order_id is None and not self._typed_order_numbers:
+            # Reuse the focus only when the customer typed no other number; a
+            # discarded or missing extraction must not show a different order.
+            order_id = self.session.selected_order_id
+        if order_id is None:
+            return _result(
+                intent.type, "needs_information", "ORDER_ID_MISSING", ("order_id",)
+            )
+        order = self.snapshot.orders.get(order_id)
+        if order is None or order.customer_id != customer_id:
+            # Foreign and nonexistent orders are indistinguishable externally.
+            return _result(intent.type, "not_found", "ORDER_NOT_ACCESSIBLE")
+        return OrderStatusResult(
+            status="success",
+            data=OrderData(
+                order_id=order.order_id,
+                status=order.status,
+                recorded_total_brl=order.total_brl,
+                tracking_code=order.tracking_code,
+                estimated_delivery=order.estimated_delivery,
+            ),
         )
 
     def _payment(self, intent, selected, original_display, pinned):

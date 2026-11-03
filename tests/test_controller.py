@@ -240,7 +240,7 @@ def test_operation_failure_is_redacted_and_independent_work_continues(
     assert response.text.index("Piano") < response.text.index("Não consegui")
 
 
-def test_unsupported_order_does_not_disclose_existence(app):
+def test_order_without_identity_does_not_disclose_existence(app):
     a = turn(app, {"type": "order_status", "order_id": 1})
     b = turn(app, {"type": "order_status", "order_id": 999})
     assert a.text == b.text
@@ -338,3 +338,56 @@ def test_quote_keeps_selection_when_independent_search_replaces_old_list(app):
     assert response.results[-1].status == "success"
     assert response.results[-1].data.product_id == 20
     assert response.results[-1].data.final_total_brl == Decimal("2000")
+
+
+def test_new_quote_for_pending_product_keeps_declared_quantity(app):
+    turn(app, search("Violão"))
+    response = turn(
+        app, payment(product_reference={"kind": "ordinal", "ordinal": 2}, quantity=1)
+    )
+    assert response.results[-1].missing_fields == ("payment_method",)
+    # The model answers the clarification with a new turn instead of an update.
+    response = turn(
+        app, payment(product_reference={"kind": "selected"}, payment_method="pix")
+    )
+    assert response.results[-1].status == "success"
+    assert response.results[-1].data.product_id == 20
+    assert response.results[-1].data.quantity == 1
+    assert not app.session.pending
+
+
+def test_quote_for_another_product_does_not_inherit_pending_facts(app):
+    turn(app, search("Violão"))
+    turn(app, payment(product_reference={"kind": "ordinal", "ordinal": 2}, quantity=3))
+    response = turn(
+        app,
+        payment(
+            product_reference={"kind": "ordinal", "ordinal": 1}, payment_method="pix"
+        ),
+    )
+    assert response.results[-1].missing_fields == ("quantity",)
+
+
+def test_search_in_same_turn_blocks_inheriting_other_product_facts(app):
+    turn(app, search("Violão"))
+    turn(app, payment(product_reference={"kind": "ordinal", "ordinal": 2}, quantity=2))
+    response = turn(
+        app,
+        search("Piano"),
+        payment(product_reference={"kind": "selected"}, payment_method="pix"),
+    )
+    assert response.results[-1].status == "needs_information"
+    assert response.results[-1].missing_fields == ("quantity",)
+
+
+def test_new_installments_are_not_replaced_by_inherited_method(app):
+    turn(app, search("Violão"))
+    turn(
+        app,
+        payment(
+            product_reference={"kind": "ordinal", "ordinal": 2}, payment_method="pix"
+        ),
+    )
+    response = turn(app, payment(installments=1, quantity=1))
+    assert response.results[-1].status != "success"
+    assert "PIX" not in response.text

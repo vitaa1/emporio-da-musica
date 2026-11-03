@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from .contracts.results import CatalogData, ProductQuote
+from .contracts.results import CatalogData, OrderData, ProductQuote
 
 AVAILABILITY = {
     "available": "disponível para a quantidade solicitada",
@@ -22,6 +22,18 @@ FIELDS = {
     "quantity": "a quantidade",
     "payment_method": "a forma de pagamento",
     "installments": "o número de parcelas",
+    "order_id": "o número do pedido",
+}
+OPERATIONS = {
+    "order_status": "a consulta do pedido",
+    "payment_options": "a cotação",
+}
+ORDER_STATUS = {
+    "pending": "aguardando confirmação",
+    "confirmed": "confirmado, aguardando envio",
+    "shipped": "enviado",
+    "delivered": "entregue",
+    "cancelled": "cancelado",
 }
 REASONS = {
     "NO_CATALOG_MATCH": "Não encontrei produtos com esses critérios.",
@@ -31,8 +43,13 @@ REASONS = {
     "MULTIPLE_ACTIVE_PROMOTIONS": "Há promoções ativas conflitantes; o preço precisa de confirmação da loja.",
     "OPERATION_NOT_SUPPORTED": "Essa operação ainda não está disponível nesta demonstração.",
     "OPERATION_FAILED": "Não consegui concluir essa consulta. Tente novamente.",
-    "ORDER_ACCESS_DENIED": "Não posso consultar esse pedido nesta sessão.",
+    "ORDER_ACCESS_DENIED": "Para consultar pedidos, é preciso iniciar a sessão de demonstração com um cliente simulado; nenhum pedido foi consultado.",
+    "ORDER_NOT_ACCESSIBLE": "Não encontrei esse pedido entre os pedidos do cliente desta sessão. Confira o número informado.",
 }
+
+
+CATALOG_FOOTER = "Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada."
+ORDER_FOOTER = "Dados do registro histórico do pedido, sem consulta em tempo real à transportadora; nenhuma alteração foi feita."
 
 
 def money(amount: Decimal) -> str:
@@ -64,8 +81,28 @@ def render_quote(quote: ProductQuote) -> str:
     return " ".join(parts)
 
 
+def render_order(order: OrderData) -> str:
+    lines = [
+        f"Pedido {order.order_id}: {ORDER_STATUS[order.status]}.",
+        f"Total registrado no pedido: {money(order.recorded_total_brl)}.",
+    ]
+    if order.tracking_code:
+        lines.append(f"Código de rastreio: {safe_text(order.tracking_code)}.")
+    else:
+        lines.append("Código de rastreio: ainda não registrado.")
+    if order.estimated_delivery:
+        lines.append(
+            "Previsão de entrega (estimativa, não confirma o recebimento): "
+            + order.estimated_delivery.strftime("%d/%m/%Y")
+            + "."
+        )
+    else:
+        lines.append("Previsão de entrega: ainda não registrada.")
+    return " ".join(lines)
+
+
 def compose(results, displayed_ids: tuple[int, ...], pending) -> str:
-    completed, limitations = [], []
+    completed, limitations, footers = [], [], []
     for result in results:
         if result.status == "success":
             if isinstance(result.data, CatalogData):
@@ -78,9 +115,14 @@ def compose(results, displayed_ids: tuple[int, ...], pending) -> str:
                         f"Mostrando {len(result.data.products)} de {result.data.total_matches} resultados; refine a busca para ver outros."
                     )
                 completed.append("\n".join(lines))
+                footers.append(CATALOG_FOOTER)
             elif isinstance(result.data, ProductQuote):
                 position = displayed_ids.index(result.data.product_id) + 1
                 completed.append(f"{position}. {render_quote(result.data)}")
+                footers.append(CATALOG_FOOTER)
+            elif isinstance(result.data, OrderData):
+                completed.append(render_order(result.data))
+                footers.append(ORDER_FOOTER)
         elif result.status != "needs_information":
             limitations.append(
                 REASONS.get(
@@ -88,12 +130,19 @@ def compose(results, displayed_ids: tuple[int, ...], pending) -> str:
                 )
             )
     blocks = completed + limitations
-    if completed:
-        blocks.append(
-            "Valores e disponibilidade do arquivo de dados; nenhuma compra ou reserva foi realizada."
-        )
+    blocks.extend(dict.fromkeys(footers))
     if pending:
-        fields = pending[0].requested_fields
-        labels = [FIELDS.get(field, "os dados solicitados") for field in fields]
-        blocks.append("Para continuar, informe " + ", ".join(labels) + ".")
+        # One focused question at a time; other waiting operations are announced.
+        first = pending[0]
+        labels = [FIELDS.get(f, "os dados solicitados") for f in first.requested_fields]
+        subject = (
+            f" {OPERATIONS.get(first.declarations.intent.type, 'a consulta')}"
+            if len(pending) > 1
+            else ""
+        )
+        blocks.append(f"Para continuar{subject}, informe " + ", ".join(labels) + ".")
+        if len(pending) > 1:
+            blocks.append(
+                f"Depois disso, ainda há {len(pending) - 1} consulta(s) aguardando dados."
+            )
     return "\n\n".join(blocks)

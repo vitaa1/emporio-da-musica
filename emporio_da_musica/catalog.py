@@ -7,7 +7,7 @@ from .contracts.intents import ProductSearch
 from .contracts.results import CatalogData, ProductQuote, ProductSearchResult
 from .data.records import Snapshot
 
-MAX_CATALOG_RESULTS = 5
+MAX_CATALOG_RESULTS = 10
 PIX_DISCOUNT_PERCENT = Decimal("5")  # Supplied manual §3.
 CENT = Decimal("0.01")
 

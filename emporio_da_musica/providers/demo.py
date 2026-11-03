@@ -26,6 +26,22 @@ class DemoProvider:
                     "payment_method": method,
                 }
             elif (
+                command == "/pedido"
+                and rest
+                and request.pending
+                and request.pending[0].operation == "order_status"
+            ):
+                return json.dumps(
+                    {
+                        "pending_id": request.pending[0].pending_id,
+                        "update": {"type": "order_status", "order_id": int(rest)},
+                    }
+                )
+            elif command == "/pedido":
+                intent = {"type": "order_status"}
+                if rest:
+                    intent["order_id"] = int(rest)
+            elif (
                 command in {"/escolher", "/quantidade", "/pagamento"}
                 and request.pending
             ):

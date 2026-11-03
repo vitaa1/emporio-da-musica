@@ -16,12 +16,12 @@ class FakeProvider:
         return response if isinstance(response, str) else json.dumps(response)
 
 
-def turn(app, *intents):
+def turn(app, *intents, message="synthetic customer message"):
     app.provider.responses.append({"intents": intents})
-    return app.handle("synthetic customer message")
+    return app.handle(message)
 
 
-def update(app, **fields):
+def update(app, message="synthetic correction", **fields):
     pending = app.session.pending[0]
     app.provider.responses.append(
         {
@@ -29,7 +29,7 @@ def update(app, **fields):
             "update": {"type": pending.declarations.intent.type, **fields},
         }
     )
-    return app.handle("synthetic correction")
+    return app.handle(message)
 
 
 def search(query):
