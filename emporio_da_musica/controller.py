@@ -1,5 +1,6 @@
 """Sequential catalog controller; provider proposals never own execution state."""
 
+import difflib
 import logging
 import re
 from dataclasses import dataclass
@@ -8,7 +9,14 @@ from decimal import Decimal
 from pydantic import ValidationError
 
 from .catalog import normalize, quote_product, search_catalog
-from .composer import BUDGET_IGNORED, CITY_ASSUMED, QUOTE_FACTS_REUSED, compose
+from .composer import (
+    BUDGET_IGNORED,
+    CITY_ASSUMED,
+    QUOTE_FACTS_REUSED,
+    SEARCH_FILTER_DROPPED,
+    compose,
+    render_alternatives,
+)
 from .contracts.common import MAX_MESSAGE_LENGTH
 from .contracts.dates import Clock, store_today
 from .contracts.intents import (
@@ -28,6 +36,7 @@ from .contracts.intents import (
 )
 from .contracts.results import (
     RESULT_ADAPTER,
+    CatalogData,
     CatalogGuide,
     ComplaintData,
     ComplaintResult,
@@ -39,6 +48,7 @@ from .contracts.results import (
     PaymentOptionsResult,
     PolicyData,
     PolicyQuestionResult,
+    ProductSearchResult,
     ReturnAssessmentResult,
     ShippingData,
     ShippingQuoteResult,
@@ -95,6 +105,9 @@ INSTRUMENT_CATEGORIES = {
     "baixos": "Baixos",
 }
 MIN_RECOVERED_TERM_LENGTH = 4
+MIN_CORRECTABLE_LENGTH = 5
+NOT_MISSPELLED = {"musica", "musico"}
+MAX_ALTERNATIVES = 3
 PURCHASE_WORDS = re.compile(
     r"\b(quero|queria|querendo|comprar|compra|procuro|procurando|preciso|gostaria"
     r"|interesse|interessad[oa])\b"
@@ -102,6 +115,41 @@ PURCHASE_WORDS = re.compile(
 LIST_WORDS = re.compile(
     r"\b(liste|listar|lista|mostre|mostrar|mostra|quais|opcoes|todos|todas|catalogo"
     r"|ver)\b"
+)
+# Words that make a message a store-policy question even if the model misroutes it.
+POLICY_TOPIC = re.compile(
+    r"\b(prazo|prazos|devolucao|devolucoes|devolver|troca|trocas|trocar|garantia"
+    r"|frete|entrega|pagamento|pagamentos|parcelar|parcelamento|boleto|horario"
+    r"|horarios|abre|abrem|fecha|fecham|funciona|funcionam|endereco|acumula|acumular"
+    r"|acumulam|desconto|descontos|reembolso)\b"
+)
+# Families the store's categories mention but the catalog has no product for.
+OUTSIDE_CATALOG = re.compile(
+    r"\b(violino|violinos|violoncelo|violoncelos|flauta|flautas|clarinete|clarinetes"
+    r"|saxofone|saxofones|oboe|oboes|fagote|fagotes|trompete|trompetes|trombone"
+    r"|trombones|tuba|tubas|trompa|trompas|harpa|harpas)\b"
+)
+SELL_QUESTION = re.compile(r"\b(vende|vendem|vendas?|tem|tens|trabalh\w+|possuem)\b")
+PROMOTION_WORDS = re.compile(r"\b(promocao|promocoes|oferta|ofertas)\b")
+PROMOTION_RULE = re.compile(
+    r"\b(acumula|acumular|acumulam|cumulativ[oa]|pix|regra|regras|politica|como funcion\w+)\b"
+)
+SOCIAL_WORDS = re.compile(
+    r"\b(oi|oie|ola|opa|e ai|eai|salve|beleza|como vai|boas|fala|hey|hello|bom dia|boa tarde|boa noite|tudo bem|tudo bom"
+    r"|obrigad[oa]|valeu|tchau|ate mais|ate logo|adeus)\b"
+)
+IDENTITY_QUESTION = re.compile(
+    r"\b(quem e voce|quem e vc|quem es|qual (e )?o? ?seu nome|com quem (eu )?falo"
+    r"|voce e (um )?(robo|humano|uma pessoa|uma ia))\b"
+)
+OTHER_METHOD = re.compile(r"\b(pix|boleto|debito)\b")
+# After a brand: an unknown next word is a model the promotion must not stand in for.
+AFTER_NAME_WORDS = {
+    "tem", "tens", "esta", "ta", "em", "com", "no", "na", "de", "do", "da", "ainda",
+    "e", "ou", "ficou", "entrou", "promocao", "oferta", "por", "para",
+}  # fmt: skip
+INSTALLMENT_COUNT_QUESTION = re.compile(
+    r"\b(quantas vezes|quantas parcelas|ate quantas)\b"
 )
 BUDGET_HINT = re.compile(
     r"\b(ate|menos|abaixo|orcamento|reais|mil)\b|r\$|\b[0-9][0-9.,]*\b"
@@ -137,6 +185,50 @@ def _rerouted_search(snapshot, intent, message, guided_category, intent_count):
     """Route two observed model mistakes back to the catalog search."""
     text = normalize(message)
     if (
+        intent_count == 1
+        and isinstance(intent, PolicyQuestion)
+        and ACCESSORY_WORDS.search(text)
+        and SELL_QUESTION.search(text)
+        and not POLICY_TOPIC.search(text)
+    ):
+        return OutOfScope(
+            type="out_of_scope", topic=ACCESSORY_WORDS.search(text).group(0)
+        )
+    if intent_count == 1 and isinstance(intent, (PolicyQuestion, OutOfScope)):
+        outside = OUTSIDE_CATALOG.search(text)
+        if (
+            outside
+            and not ACCESSORY_WORDS.search(text)
+            and not POLICY_TOPIC.search(text)
+            and (isinstance(intent, OutOfScope) or SELL_QUESTION.search(text))
+            and not any(
+                outside.group(0) in normalize(p.name)
+                for p in snapshot.products.values()
+            )
+        ):
+            # The manual's general text must not imply these are for sale.
+            return ProductSearch(type="product_search", query=outside.group(0))
+        if (
+            PROMOTION_WORDS.search(text)
+            and not PROMOTION_RULE.search(text)
+            and not POLICY_TOPIC.search(text)
+        ):
+            return ProductSearch(type="product_search")
+        if (
+            isinstance(intent, OutOfScope)
+            and POLICY_TOPIC.search(text)
+            and not ACCESSORY_WORDS.search(text)
+        ):
+            return PolicyQuestion(type="policy_question")
+    if (
+        intent_count == 1
+        and isinstance(intent, SmallTalk)
+        and intent.kind in (None, "greeting")
+        and not SOCIAL_WORDS.search(text)
+        and not IDENTITY_QUESTION.search(text)
+    ):
+        return OutOfScope(type="out_of_scope", topic="outro assunto")
+    if (
         isinstance(intent, ProductSearch)
         and intent_count == 1
         and ACCESSORY_WORDS.search(text)
@@ -155,7 +247,9 @@ def _rerouted_search(snapshot, intent, message, guided_category, intent_count):
     ):
         # "Yamaha", answering "which brand?", is a filter and not yet a quote.
         return ProductSearch(
-            type="product_search", query=intent.product_reference.query
+            type="product_search",
+            query=intent.product_reference.query,
+            quantity=intent.quantity,
         )
     if isinstance(intent, OutOfScope) and intent_count == 1:
         # "mostre as guitarras" sent out of scope; accessories remain out of scope.
@@ -163,7 +257,74 @@ def _rerouted_search(snapshot, intent, message, guided_category, intent_count):
         wanted = LIST_WORDS.search(text) or PURCHASE_WORDS.search(text)
         if len(named) == 1 and wanted and not ACCESSORY_WORDS.search(text):
             return ProductSearch(type="product_search", category=named.pop())
+        if not ACCESSORY_WORDS.search(text):
+            # A store brand sent out of scope, as seen after a failed search.
+            brands = (set(_words(message)) & set(_brand_names(snapshot))) - set(
+                INSTRUMENT_CATEGORIES
+            )
+            if len(brands) == 1:
+                return ProductSearch(type="product_search", query=brands.pop())
     return intent
+
+
+def _active_promotions(snapshot, intent, message):
+    """Real active promotions matching the instruments and every name typed."""
+    named = _named_categories(snapshot, message)
+    if intent.category:
+        named = {intent.category}
+    products = (
+        [p for category in named for p in _category_products(snapshot, category)]
+        if named
+        else list(snapshot.products.values())
+    )
+    # Short model codes such as "D-8" also count, or another model could answer.
+    vocabulary = {
+        word
+        for product in snapshot.products.values()
+        for word in _words(product.name)
+        if len(word) >= MIN_RECOVERED_TERM_LENGTH or re.search(r"[0-9]", word)
+    }
+    typed = (set(_words(message)) & vocabulary) - set(INSTRUMENT_CATEGORIES)
+    typed -= {w for w in typed if w.isdigit()}
+    written = _words(message)
+    brands = set(_brand_names(snapshot))
+    for word, following in zip(written, written[1:]):
+        if (
+            word in brands
+            and following not in vocabulary
+            and following not in AFTER_NAME_WORDS
+        ):
+            return []
+    ids = []
+    for product in sorted(products, key=lambda p: p.product_id):
+        promotions = snapshot.promotions_by_product[product.product_id]
+        if not any(p.is_active for p in promotions):
+            continue
+        if typed <= set(_words(product.name)):
+            ids.append(product.product_id)
+    return ids
+
+
+def _brand_names(snapshot):
+    """Catalog brands by their normalized word, taken from leading name words."""
+    brands = {_words(p.name)[0]: p.name.split()[0] for p in snapshot.products.values()}
+    for generic in GENERIC_NAME_WORDS:
+        brands.pop(generic, None)
+    if "music" in brands:
+        brands["music"] = "Music Man"  # The only two-word brand in the catalog.
+    return brands
+
+
+def _spelling_correction(snapshot, query):
+    """The catalog word closest to a typed name that matches no product."""
+    word = normalize(query)
+    if len(word) < MIN_CORRECTABLE_LENGTH or " " in word:
+        return None
+    # Brands only, and strict: ordinary words are close to many product words.
+    if word in NOT_MISSPELLED:
+        return None
+    close = difflib.get_close_matches(word, _brand_names(snapshot), n=1, cutoff=0.85)
+    return close[0] if close else None
 
 
 def _catalog_guide(snapshot, intent):
@@ -172,15 +333,11 @@ def _catalog_guide(snapshot, intent):
         if intent.category
         else list(snapshot.products.values())
     )
-    brand_words = {
-        _words(p.name)[0]: p.name.split()[0] for p in snapshot.products.values()
-    }
-    for generic in GENERIC_NAME_WORDS:
-        brand_words.pop(generic, None)
-    if "music" in brand_words:
-        brand_words["music"] = "Music Man"  # The only two-word brand in the catalog.
+    brand_words = _brand_names(snapshot)
     brands = []
     for product in sorted(products, key=lambda p: p.product_id):
+        if product.status != "active" or product.stock_quantity == 0:
+            continue
         for word in _words(product.name):
             brand = brand_words.get(word)
             if brand and brand not in brands:
@@ -198,14 +355,17 @@ def _catalog_guide(snapshot, intent):
     )
 
 
-LOW_PRICE_PHRASE = re.compile(r"\b(mais|preco|valor|custo|bem|muito|por)\s+baixo\b")
+LOW_PRICE_PHRASE = re.compile(
+    r"\b(mais|precos?|valor|valores|custo|bem|muito|por)\s+(mais\s+)?baixos?\b"
+    r"|\bbaixos?\s+(custo|preco|valor)"
+)
 
 
 def _named_categories(snapshot, message):
     """Categories of instruments typed; "preço baixo" does not name a bass."""
     words = set(_words(message))
     if LOW_PRICE_PHRASE.search(normalize(message)):
-        words.discard("baixo")
+        words -= {"baixo", "baixos"}
     return {
         INSTRUMENT_CATEGORIES[word]
         for word in words
@@ -236,6 +396,11 @@ def _checked_search_terms(snapshot, intent, message):
     """
     typed = _words(message)
     query, category = intent.query, intent.category
+    if category and normalize(category) in INSTRUMENT_CATEGORIES:
+        # The contract's category is free text: "Violão" is not part of "Violões".
+        alias = INSTRUMENT_CATEGORIES[normalize(category)]
+        if _category_products(snapshot, alias):
+            category = alias
     named = _named_categories(snapshot, message)
     inferred = next(iter(named)) if len(named) == 1 else None
     if query and _typed_amounts(query) == {intent.max_price_brl}:
@@ -245,6 +410,13 @@ def _checked_search_terms(snapshot, intent, message):
         alias = INSTRUMENT_CATEGORIES[normalize(query)]
         if _category_products(snapshot, alias):
             query, category = None, category or alias
+    corrected = False
+    if query and not any(
+        normalize(query) in normalize(p.name) for p in snapshot.products.values()
+    ):
+        correction = _spelling_correction(snapshot, query)
+        if correction and normalize(query) in typed:
+            query, corrected = correction, True
     if (
         query
         and inferred
@@ -255,7 +427,7 @@ def _checked_search_terms(snapshot, intent, message):
     ):
         # A price, adjective, or invented word cannot hide the instrument typed.
         query, category = None, category or inferred
-    if query and not set(_words(query)) <= set(typed):
+    if query and not corrected and not set(_words(query)) <= set(typed):
         category = category or inferred
         if category:
             query = None
@@ -338,7 +510,8 @@ _NOT_PIX = re.compile(
 
 def pix_declared(message):
     """PIX named with no negation and no other payment term nearby in the message."""
-    text = normalize(message)
+    # "Bass 3X" is a model name, not an installment count.
+    text = re.sub(r"\bbass [0-9]+ ?x\b", "", normalize(message))
     return re.search(r"\bpix\b", text) is not None and not _NOT_PIX.search(text)
 
 
@@ -539,9 +712,16 @@ class Controller:
             return self._finish(message, MODEL_UNAVAILABLE)
         except (ProposalError, ProviderError) as error:
             LOGGER.warning("Extraction failed: %s", type(error).__name__)
-            return self._finish(
-                message, "Não consegui interpretar sua mensagem. Tente novamente."
-            )
+            if (
+                self.session.pending
+                or not POLICY_TOPIC.search(normalize(message))
+                or not hasattr(self.provider, "explain")
+            ):
+                return self._finish(
+                    message, "Não consegui interpretar sua mensagem. Tente novamente."
+                )
+            # The manual route is a separate call and can still answer this.
+            proposal = IntentTurn(intents=[PolicyQuestion(type="policy_question")])
 
         prior = None
         kept = []
@@ -613,10 +793,23 @@ class Controller:
                     intent = intent.model_copy(update={"max_price_brl": None})
                     if BUDGET_HINT.search(normalize(message)):
                         notes.append(BUDGET_IGNORED)
-                intent = _checked_search_terms(self.snapshot, intent, message)
-                if not intent.category and guided_category:
+                if (
+                    not intent.category
+                    and guided_category
+                    and not _named_categories(self.snapshot, message)
+                ):
                     # Answering "which brand?" continues the instrument just asked.
                     intent = intent.model_copy(update={"category": guided_category})
+                original_query = intent.query
+                intent = _checked_search_terms(self.snapshot, intent, message)
+                if (
+                    original_query
+                    and not intent.query
+                    and set(_words(original_query)) <= set(_words(message))
+                    and not _typed_amounts(original_query)
+                    and normalize(original_query) not in INSTRUMENT_CATEGORIES
+                ):
+                    notes.append(SEARCH_FILTER_DROPPED)
             if isinstance(intent, QUOTES) and _payment_only(intent.product_reference):
                 intent = intent.model_copy(update={"product_reference": None})
             checked.append(intent)
@@ -723,6 +916,11 @@ class Controller:
                 selected_order = (
                     outcome.data.order_id if outcome.status == "success" else None
                 )
+            unavailable = self._unavailable_product(outcome, resolved)
+            if unavailable is not None:
+                alternatives = self._alternatives(unavailable)
+                if alternatives:
+                    notes.append(render_alternatives(alternatives))
             if (
                 isinstance(intent, PaymentOptions)
                 and outcome.status == "needs_information"
@@ -792,6 +990,20 @@ class Controller:
         return TurnResponse(text, results)
 
     def _execute(self, intent, selected, original_display, pinned):
+        if (
+            self._intent_count == 1
+            and isinstance(intent, (OutOfScope, SmallTalk, PolicyQuestion))
+            and IDENTITY_QUESTION.search(normalize(self._message))
+        ):
+            data = SmallTalkData(template="identity")
+            return SmallTalkResult(status="success", data=data), None, None
+        if (
+            self._intent_count == 1
+            and isinstance(intent, ProductSearch)
+            and PROMOTION_WORDS.search(normalize(self._message))
+        ):
+            result = self._promotions(intent)
+            return result, result if result.status == "success" else None, None
         if isinstance(intent, ProductSearch):
             result = search_catalog(self.snapshot, intent)
             if (
@@ -1018,6 +1230,81 @@ class Controller:
             self._reused_quote = True
         return type(intent).model_validate(intent.model_dump() | changes)
 
+    def _unavailable_product(self, outcome, resolved):
+        if outcome.status == "unavailable" and resolved is not None:
+            return resolved
+        if (
+            isinstance(outcome, ProductSearchResult)
+            and outcome.status == "success"
+            and outcome.data.total_matches == 1
+            and outcome.data.products
+        ):
+            product = self.snapshot.products[outcome.data.products[0].product_id]
+            if product.status != "active" or product.stock_quantity == 0:
+                return product.product_id
+        return None
+
+    def _alternatives(self, product_id):
+        """Same-category products on sale, closest in list price (manual §7.3)."""
+        chosen = self.snapshot.products[product_id]
+        options = sorted(
+            (
+                p
+                for p in self.snapshot.products.values()
+                if p.category_id == chosen.category_id
+                and p.product_id != product_id
+                and p.status == "active"
+                and p.stock_quantity > 0
+            ),
+            key=lambda p: (abs(p.price_brl - chosen.price_brl), p.product_id),
+        )[:MAX_ALTERNATIVES]
+        quotes = []
+        for option in options:
+            found = quote_product(
+                self.snapshot, option.product_id, ProductSearch(type="product_search")
+            )
+            if found.status == "success":
+                quotes.extend(found.data.products)
+        return quotes
+
+    def _promotions(self, intent):
+        ids = _active_promotions(self.snapshot, intent, self._message)
+        if not ids:
+            return ProductSearchResult(
+                status="not_found",
+                reason_code="NO_ACTIVE_PROMOTION",
+                policy_references=("6",),
+            )
+        quotes = []
+        for product_id in ids:
+            found = quote_product(
+                self.snapshot,
+                product_id,
+                # Already validated on the intent; its budget is a Decimal now.
+                ProductSearch(type="product_search").model_copy(
+                    update={
+                        "quantity": intent.quantity,
+                        "max_price_brl": intent.max_price_brl,
+                    }
+                ),
+            )
+            if found.status == "not_found":
+                continue  # Above the requested budget.
+            if found.status != "success":
+                return found
+            quotes.extend(found.data.products)
+        if not quotes:
+            return ProductSearchResult(
+                status="not_found",
+                reason_code="NO_ACTIVE_PROMOTION",
+                policy_references=("6",),
+            )
+        return ProductSearchResult(
+            status="success",
+            data=CatalogData(products=tuple(quotes), total_matches=len(quotes)),
+            policy_references=("6",),
+        )
+
     def _policy(self, intent):
         if not hasattr(self.provider, "explain"):
             return _result(intent.type, "unavailable", "POLICY_MODEL_UNAVAILABLE")
@@ -1036,7 +1323,11 @@ class Controller:
             # are still filtered for contacts in providers/policy.py.
             return _result(intent.type, "requires_confirmation", "CONTACT_CONFLICT")
         try:
-            data = explain_policy(self.provider, question)
+            data = explain_policy(
+                self.provider,
+                question,
+                on_policy_topic=bool(POLICY_TOPIC.search(normalize(question))),
+            )
         except NotCovered:
             if ADDRESS_ONLY.match(normalize(question)):
                 return self._store_address()
@@ -1173,6 +1464,17 @@ class Controller:
                     self.snapshot,
                     ProductSearch(type="product_search", query=reference.query),
                 )
+                # "ukulele Kala KA-C": the product type is not part of the name.
+                named = [
+                    word
+                    for word in reference.query.split()
+                    if normalize(word) not in INSTRUMENT_CATEGORIES
+                ]
+                if found.status == "not_found" and named:
+                    found = search_catalog(
+                        self.snapshot,
+                        ProductSearch(type="product_search", query=" ".join(named)),
+                    )
                 if found.status != "success":
                     return (
                         _result(
@@ -1189,6 +1491,28 @@ class Controller:
                     resolved = found.data.products[0].product_id
         if resolved is not None and resolved not in self.snapshot.products:
             resolved = None
+        if resolved is not None:
+            product = self.snapshot.products[resolved]
+            if product.status != "active" or product.stock_quantity == 0:
+                # No totals or further questions for something not for sale.
+                return (
+                    _result("payment_options", "unavailable", "PRODUCT_NOT_FOR_SALE"),
+                    None,
+                    resolved,
+                )
+            text = normalize(self._message)
+            if (
+                INSTALLMENT_COUNT_QUESTION.search(text)
+                and intent.payment_method in (None, "credit")
+                and not OTHER_METHOD.search(text)
+            ):
+                # Asking the limit is not a purchase: answer for one unit on credit.
+                intent = intent.model_copy(
+                    update={
+                        "quantity": intent.quantity or 1,
+                        "payment_method": "credit",
+                    }
+                )
         missing = []
         if resolved is None:
             missing.append("product_reference")
@@ -1257,7 +1581,11 @@ class Controller:
             return (
                 ShippingQuoteResult(
                     status=quote.status,
-                    reason_code=quote.reason_code,
+                    reason_code=(
+                        "PRODUCT_NOT_SHIPPABLE"
+                        if quote.reason_code == "PRODUCT_NOT_FOR_SALE"
+                        else quote.reason_code
+                    ),
                     policy_references=quote.policy_references,
                 ),
                 choices,

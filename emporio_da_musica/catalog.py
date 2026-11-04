@@ -116,11 +116,20 @@ def _search(snapshot, intent, *, product_id=None):
         )
     query = normalize(intent.query or "")
     category = normalize(intent.category or "")
+    # Without the exact phrase, "GD20 Natural" still finds "GD20 Dreadnought Natural".
+    exact_phrase = any(query in normalize(p.name) for p in snapshot.products.values())
     quotes = []
     for product in sorted(snapshot.products.values(), key=lambda p: p.product_id):
         if product_id is not None and product.product_id != product_id:
             continue
-        if query not in normalize(product.name):
+        name = normalize(product.name)
+        if exact_phrase:
+            if query not in name:
+                continue
+        elif not all(
+            word in name.split() if word.isdigit() else word in name
+            for word in query.split()
+        ):
             continue
         if category not in normalize(snapshot.categories[product.category_id].name):
             continue

@@ -615,5 +615,109 @@
         "manual_review": "Payment options match the unit price; PIX is 5% lower."
       }
     ]
+  },
+  {
+    "id": "policy-recall",
+    "customer_id": null,
+    "origin": "requirement probe; messages that failed on 2026-11-03",
+    "turns": [
+      {
+        "message": "vocês abrem domingo?",
+        "expected": [
+          {
+            "operation": "policy_question",
+            "status": "success"
+          }
+        ],
+        "manual_review": "Says the store is closed on Sundays."
+      },
+      {
+        "message": "qual o prazo para devolução?",
+        "expected": [
+          {
+            "operation": "policy_question",
+            "status": "success"
+          }
+        ],
+        "manual_review": "Reviewed summary of §§4.1–4.3."
+      },
+      {
+        "message": "a promoção acumula com pix?",
+        "expected": [
+          {
+            "operation": "policy_question",
+            "status": "success"
+          }
+        ],
+        "manual_review": "Says discounts do not stack."
+      }
+    ]
+  },
+  {
+    "id": "promotions",
+    "customer_id": null,
+    "origin": "requirement probe; messages that failed on 2026-11-03",
+    "turns": [
+      {
+        "message": "tem ukulele em promoção?",
+        "expected": [
+          {
+            "operation": "product_search",
+            "status": "success",
+            "data": {
+              "total_matches": 2
+            }
+          }
+        ],
+        "manual_review": null
+      },
+      {
+        "message": "o Fender Stratocaster está em promoção?",
+        "expected": [
+          {
+            "operation": "product_search",
+            "status": "not_found"
+          }
+        ],
+        "manual_review": null
+      }
+    ]
+  },
+  {
+    "id": "catalog-and-scope",
+    "customer_id": null,
+    "origin": "requirement probe; messages that failed on 2026-11-03",
+    "turns": [
+      {
+        "message": "vocês vendem violino?",
+        "expected": [
+          {
+            "operation": "product_search",
+            "status": "not_found"
+          }
+        ],
+        "manual_review": null
+      },
+      {
+        "message": "me conta uma piada",
+        "expected": [
+          {
+            "operation": "out_of_scope",
+            "status": "success"
+          }
+        ],
+        "manual_review": null
+      },
+      {
+        "message": "quem é você?",
+        "expected": [
+          {
+            "operation": "small_talk",
+            "status": "success"
+          }
+        ],
+        "manual_review": "States the store's assistant role."
+      }
+    ]
   }
 ]

@@ -154,7 +154,8 @@ def test_out_of_scope_redirects_without_partner_stores(app):
     ],
 )
 def test_small_talk_templates(app, kind, expected):
-    response = turn(app, {"type": "small_talk", "kind": kind})
+    message = {"thanks": "obrigado", "goodbye": "tchau"}.get(kind, "oi")
+    response = turn(app, {"type": "small_talk", "kind": kind}, message=message)
     assert expected in response.text
     assert app.provider.policy_requests == []
 

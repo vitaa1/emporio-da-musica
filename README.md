@@ -201,7 +201,7 @@ The manual is ambiguous or incomplete in several places. The prototype handles t
 .venv/bin/python -m ruff format --check .
 ```
 
-The 535 deterministic tests need no model or credentials. They run in CI on Linux, Windows, and macOS.
+The 633 deterministic tests need no model or credentials. They run in CI on Linux, Windows, and macOS.
 
 On 2026-11-03, a clean copy of this documentation's working tree was verified on WSL2 with Python 3.13 in a new virtual environment: installing the pins, the data validation, the offline commands, and the model example under Quick start all worked, as did the checks above. The Quick start's PowerShell commands were also run manually on Windows with a fresh clone. A single example run does not guarantee identical model output later.
 
@@ -211,13 +211,17 @@ Model behavior is evaluated separately, because it depends on a local server and
 .venv/bin/python -m evals.suite --url http://localhost:11434 --output /tmp/emporio-evaluation.json
 ```
 
-The latest recorded run passed 36 of 36 turns across 15 scenarios. The cases were informed by development, so this is a regression check rather than an independent accuracy measure. [The evaluation report](docs/AGENT_EVALUATION.md) keeps the earlier failing runs and their corrections, including one provider error whose cause was not determined.
+The latest recorded run passed 44 of 44 turns across 18 scenarios. The cases were informed by development, so this is a regression check rather than an independent accuracy measure. [The evaluation report](docs/AGENT_EVALUATION.md) keeps the earlier failing runs and their corrections, including one provider error whose cause was not determined.
 
 ## Known limitations
 
 - **Catalog browsing is basic.** Lists stop at ten items with no next page, and "preço mais baixo" is not sorted by price. Two filters in one message, such as two brands, are not combined. The guards that correct search terms cover the catalog's main instrument words, not every phrasing.
 - **Interpretation errors remain possible.** Quantity is not checked against arbitrary wording, generic "cartão" depends on the model, and negations may trigger an extra clarification.
-- **Policy prose is not proven correct.** Validators reject invented numbers, unknown sections, and claims of executed actions, but a misstated rule using valid numbers can pass. Only warranty-only answers use a fixed reviewed summary.
+- **Recommendations are not supported.** "Qual violão para iniciante?" is treated as out of scope rather than answered with a suggestion.
+- **Some policy answers are incomplete.** "Como funciona o frete?" can omit that the BRL 500 rule applies only to the metropolitan region, and "posso trocar se não gostar?" asks for an order number before explaining the rule.
+- **Routing relies partly on word lists.** Python corrects known routing mistakes for policy topics, promotions, and instruments outside the catalog, so other wording can still be misrouted. When the model marks a policy answer as uncovered, only a reviewed summary is shown, so some valid questions get the out-of-scope message. Two questions in one message can lose one if the model proposes a single intent.
+- **The model can invent a selection.** A list position or quantity it proposes is not checked against the message, so a quote can refer to a product the customer did not pick. Spelling correction covers brand names only, and short name fragments can match inside longer words.
+- **Policy prose is not proven correct.** Validators reject invented numbers, unknown sections, and claims of executed actions, but a misstated rule using valid numbers can pass. Warranty, store-hours, return-deadline, and discount-stacking questions use fixed reviewed summaries when they match.
 - **No transactions.** There is no basket, purchase, refund, or human handoff. "Adicione" quotes only the named product, and complaints are acknowledged with a clear statement that nothing was registered.
 - **No live data.** Stock and orders come from a snapshot, and there is no carrier integration. Freight outside Campo Grande is not quoted.
 - **No real authentication.** The customer identity is simulated.

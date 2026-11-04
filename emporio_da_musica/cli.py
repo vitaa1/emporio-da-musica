@@ -6,6 +6,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .composer import safe_text
 from .contracts.common import MAX_MESSAGE_LENGTH
 from .controller import Controller
 from .data.loader import DataError, load_snapshot
@@ -120,6 +121,7 @@ def startup_warning(provider, url):
     """Describe a server problem found at startup; the session still opens."""
     check = getattr(provider, "check_server", None)
     problem = check() if check else None
+    url = safe_text(str(url))
     if problem == "unreachable":
         return (
             f"Aviso: não consegui acessar o Ollama em {url}. Verifique se ele está em "
@@ -129,8 +131,8 @@ def startup_warning(provider, url):
         )
     if problem == "model_missing":
         return (
-            f"Aviso: o modelo {provider.model} não está instalado neste Ollama. "
-            f"Instale com: ollama pull {provider.model}"
+            f"Aviso: o modelo {safe_text(provider.model)} não está instalado neste "
+            f"Ollama. Instale com: ollama pull {safe_text(provider.model)}"
         )
     return None
 
