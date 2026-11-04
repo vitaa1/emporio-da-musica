@@ -1,11 +1,39 @@
 # Evaluation
 
-The latest recorded run, on 2026-11-04, passed **49/49 automated turn checks**
+The latest recorded full-suite run, on 2026-11-04, passed **49/49 automated turn checks**
 across 19 scenarios. Manual reading of that run was limited to its promotion and
 warranty answers; the earlier run reviewed all marked turns against the source
 as described below. **761 deterministic tests**, Ruff lint,
 and Ruff formatting passed locally. This is a small development evaluation,
 not a claim of general model reliability or production readiness.
+
+## README example verification
+
+On 2026-11-04, the three conversations in `examples/` were repeated against
+Windows-hosted Ollama using `qwen2.5:3b` and only the synthetic demo data.
+The customer messages matched the versioned scenarios exactly. Each conversation
+used a fresh session; only the order scenario selected simulated customer 3.
+
+| Scenario | Automated checks | Manual review |
+| --- | --- | --- |
+| `purchase-guidance` | 4/4 passed | Listed products, C70 selection, stock, payment options, and the two-unit PIX total match the snapshot and Python calculations. |
+| `installments-freight` | 3/3 passed | GD20 installment and PIX totals, local free freight, and outside-city limitations match the documented policy interpretation (§§3, 3.1, 5.1–5.2). |
+| `orders-access` | 4/4 passed | Existing order 1 is scoped to customer 3; foreign and nonexistent orders share a nonrevealing answer; missing order numbers trigger clarification. |
+
+All 11 rendered responses exactly matched the documented transcripts. None
+claimed that a purchase, reservation, or carrier quote had been executed.
+The [raw report](../evals/results/2026-11-04-readme-examples.json) preserves
+configuration, hashes, responses, and automated verdicts. Its manual-review flags
+remain unchanged; the source review is recorded here. This targeted run does not
+replace the full-suite result or establish reliability on other wording. Some
+turns use deterministic controller routes even with the live provider configured.
+
+The README's offline commands were also executed successfully with `--demo
+--customer-id 3`. The documentation now separates the catalog quote from the
+lookup of the existing order, and explains both numeric arguments of `/preco`.
+An earlier connection attempt could not reach Ollama and was interrupted before
+any scenario completed; it is not counted as a model evaluation. The successful
+run began after the user started the server.
 
 ## Review findings and corrections
 
