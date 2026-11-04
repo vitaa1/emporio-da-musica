@@ -206,7 +206,8 @@ def after_hours_notice(now: datetime) -> str | None:
         )
     return (
         "Estamos fora do horário de atendimento da equipe (segunda a sexta, das 9h às "
-        f"18h; sábado, das 9h às 13h). Pelo horário regular, a equipe volta {when}, se "
+        "18h; sábado, das 9h às 13h, no horário de Campo Grande/MS). "
+        f"Pelo horário regular, a equipe volta {when}, se "
         "não for feriado. Enquanto isso, posso tirar suas dúvidas por aqui."
     )
 
