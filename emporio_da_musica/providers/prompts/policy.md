@@ -28,11 +28,13 @@ confirmados e indique o endereço da loja (seção 1.2).
 
 Ambiguidades conhecidas do manual (mencione quando forem relevantes, sem resolvê-las):
 - Parcelamento: há uma regra geral de parcela mínima de R$ 100 e faixas detalhadas
-  na seção 3.1; a condição para 2–3 parcelas precisa de confirmação.
+  na seção 3.1; em 2–3 parcelas, parcela abaixo de R$ 100 precisa de confirmação.
+- Pagamento combinado: permitido acima de R$ 2.000; a divisão precisa de confirmação.
 - Frete: pedidos de exatamente R$ 500 não são cobertos claramente pela regra.
 - Troca por preferência: o manual não define a partir de quando contam os 7 dias.
 - Previsões de entrega são estimativas em dias úteis, não datas garantidas.
 - Promoção e desconto PIX não se acumulam.
+- Campanhas do manual não indicam promoção ativa; não afirme que alguma está valendo.
 
 ## Output
 

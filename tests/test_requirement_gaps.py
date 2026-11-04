@@ -122,8 +122,9 @@ def test_promotion_search_lists_real_active_promotions(demo, intent):
 def test_named_product_without_promotion_says_so(demo):
     intent = {"type": "out_of_scope", "topic": "promoção"}
     response = turn(demo, intent, message="o Fender Stratocaster está em promoção?")
-    assert response.results[0].status == "not_found"
+    assert response.results[0].data.notice
     assert "promoção ativa" in response.text
+    assert "R$" in response.text  # §7.3: the current price is presented.
 
 
 def test_promotion_rule_question_stays_on_the_policy_route(demo):

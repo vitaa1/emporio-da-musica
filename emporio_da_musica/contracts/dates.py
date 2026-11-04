@@ -16,6 +16,12 @@ def store_today(clock: Clock) -> date:
     return now.astimezone(ZoneInfo(STORE_TIMEZONE)).date()
 
 
+def store_now(clock: Clock) -> datetime:
+    now = clock()
+    store_today(lambda: now)
+    return now.astimezone(ZoneInfo(STORE_TIMEZONE))
+
+
 def resolve_receipt_date(value: str, today: date) -> date:
     relative = {"today": 0, "yesterday": 1, "day_before_yesterday": 2}
     if value in relative:

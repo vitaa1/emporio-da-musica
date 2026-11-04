@@ -1,8 +1,13 @@
 """Portuguese operational responses, composed exclusively from Python results."""
 
+from datetime import datetime
 from decimal import Decimal
 
-from .catalog import CATEGORY_IGNORED, INSTALLMENT_MINIMUM_NOT_MET
+from .catalog import (
+    CATEGORY_IGNORED,
+    INSTALLMENT_MINIMUM_NOT_MET,
+    max_small_installments,
+)
 from .contracts.results import (
     CatalogData,
     ComplaintData,
@@ -15,6 +20,10 @@ from .contracts.results import (
     SmallTalkData,
 )
 
+# Manual §2: closing hour by weekday (Monday is 0); Sunday is closed.
+STORE_OPENING = 9
+STORE_CLOSING = {0: 18, 1: 18, 2: 18, 3: 18, 4: 18, 5: 13}
+WEEKDAYS = ("segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo")
 AVAILABILITY = {
     "available": "disponível para a quantidade solicitada",
     "insufficient_stock": "estoque insuficiente",
@@ -67,8 +76,9 @@ REASONS = {
     "PRODUCT_NOT_FOR_SALE": "Esse produto não está disponível para venda agora, então não calculei valores.",
     "NO_ACTIVE_PROMOTION": "Não encontrei promoção ativa para esse pedido no catálogo.",
     "NO_CATALOG_MATCH": "Não encontrei produtos com esses critérios.",
-    "COMBINED_PAYMENT_REQUIRES_CONFIRMATION": "Pagamento combinado precisa de confirmação da loja. Não solicitei essa confirmação.",
-    "AMBIGUOUS_INSTALLMENT_BAND": "A regra para 2–3 parcelas precisa de confirmação da loja. Não solicitei essa confirmação.",
+    "COMBINED_PAYMENT_REQUIRES_CONFIRMATION": "Pelo manual, dá para combinar formas de pagamento em compras acima de R$ 2.000,00. Como dividir o valor e aplicar descontos precisa de confirmação da loja; não solicitei essa confirmação.",
+    "COMBINED_PAYMENT_BELOW_MINIMUM": "Pelo manual, só dá para combinar formas de pagamento em compras acima de R$ 2.000,00, e esse valor não passa disso. Dá para escolher uma forma só: PIX, débito, crédito ou boleto?",
+    "AMBIGUOUS_INSTALLMENT_BAND": "Com parcela abaixo de R$ 100,00, parcelar em 2 ou 3 vezes precisa de confirmação da loja, porque o manual não deixa essa regra clara. Não solicitei essa confirmação.",
     "FREE_FREIGHT_BOUNDARY": "O subtotal ficou em exatamente R$ 500,00, e o manual não define o frete nesse valor (grátis acima de R$ 500, R$ 35 abaixo). Isso precisa de confirmação da loja; não solicitei essa confirmação.",
     "DELIVERY_REGION_UNCONFIRMED": "Nesta demonstração, só calculo o frete para entregas em Campo Grande/MS. O manual não lista as cidades da região metropolitana, e o frete para outras cidades depende do CEP, do peso e das dimensões do produto, sem integração com Correios ou Jadlog aqui. Pelo manual, os prazos estimados são PAC 5 a 12, SEDEX 2 a 5 e Jadlog 3 a 8 dias úteis, e instrumentos de grande porte podem exigir cotação especial (seção 5.2). A loja precisa confirmar o valor; não solicitei essa cotação.",
     "PRODUCT_NOT_SHIPPABLE": "O produto não está disponível para a quantidade solicitada, então não calculei o frete.",
@@ -124,8 +134,13 @@ RETURN_FOOTER = "Avaliação preliminar com base no manual e nas informações d
 
 QUOTE_FACTS_REUSED = "Usei dados já informados na cotação anterior deste produto; informe outros se quiser mudar."
 CITY_ASSUMED = "City without state assumed to be Campo Grande/MS."
-SMALL_INSTALLMENTS_NOTE = "Parcelar em 2 ou 3 vezes precisa de confirmação da loja."
+SMALL_INSTALLMENTS_NOTE = (
+    "Em 2 ou 3 vezes, parcelas abaixo de R$ 100,00 precisam de confirmação da loja."
+)
 
+MAX_INSTALLMENTS_NOTE = (
+    "Pelo manual, o parcelamento vai até 12x sem juros; acima disso não é possível."
+)
 BUDGET_IGNORED = "O limite de preço não foi reconhecido nesta mensagem e não foi aplicado; informe o valor em números (por exemplo, até R$ 1000)."
 CARD_QUESTION = "Quantas unidades você quer e como prefere pagar?"
 CARD_PAYMENT_QUESTION = "Como prefere pagar?"
@@ -142,6 +157,60 @@ def money(amount: Decimal) -> str:
 def safe_text(value: str) -> str:
     """Prevent source text from emitting terminal control sequences or fake lines."""
     return " ".join("".join(c if c.isprintable() else " " for c in value).split())
+
+
+def promotion_notice(campaigns, *, current_prices, count, priced) -> str:
+    """Manual §7.3. `campaigns` holds (name, active for other products) pairs."""
+    parts = [
+        f"A promoção {name} não vale para esse pedido."
+        if elsewhere
+        else f"A promoção {name} não está ativa agora, então esse desconto não vale."
+        for name, elsewhere in campaigns
+    ]
+    if current_prices:
+        if not campaigns:
+            parts.append(
+                "Esse produto não está em promoção ativa agora."
+                if count == 1
+                else "Esses produtos não estão em promoção ativa agora."
+            )
+        if priced:
+            parts.append(
+                "O preço atual é este:" if count == 1 else "Os preços atuais são estes:"
+            )
+    else:
+        parts.append("Estas são as promoções ativas agora:")
+    return " ".join(parts)
+
+
+def promotion_label(quote: ProductQuote) -> str:
+    """Manual §6.2: a promotional price always shows the original and the percent."""
+    percent = format(quote.promotion_percent, "f").replace(".", ",")
+    return f"de {money(quote.list_unit_price_brl)}, promoção de {percent}%"
+
+
+def after_hours_notice(now: datetime) -> str | None:
+    """Manual §7.1: outside regular hours (§2), say when the team returns.
+
+    `now` is store-local. Holidays and special hours are not supplied.
+    """
+    closing = STORE_CLOSING.get(now.weekday())
+    if closing is not None and STORE_OPENING <= now.hour < closing:
+        return None
+    if closing is not None and now.hour < STORE_OPENING:
+        when = "hoje às 9h"
+    else:
+        days = next(d for d in range(1, 8) if (now.weekday() + d) % 7 in STORE_CLOSING)
+        when = (
+            "amanhã às 9h"
+            if days == 1
+            else f"{WEEKDAYS[(now.weekday() + days) % 7]} às 9h"
+        )
+    return (
+        "Estamos fora do horário de atendimento da equipe (segunda a sexta, das 9h às "
+        f"18h; sábado, das 9h às 13h). Pelo horário regular, a equipe volta {when}, se "
+        "não for feriado. Enquanto isso, posso tirar suas dúvidas por aqui."
+    )
 
 
 def render_quote(quote: ProductQuote) -> str:
@@ -175,15 +244,17 @@ def render_summary(quote: ProductQuote) -> str:
         return f"{safe_text(quote.name)} — estoque insuficiente"
     price = money(quote.final_total_brl / quote.quantity)
     if quote.promotion_percent is not None:
-        percent = format(quote.promotion_percent, "f").replace(".", ",")
-        price += f" (promoção de {percent}%)"
+        price += f" ({promotion_label(quote)})"
     return f"{safe_text(quote.name)} — {price}"
 
 
 def render_alternatives(quotes) -> str:
     """Manual §7.3: offer available options when a product is unavailable."""
     options = "; ".join(
-        f"{safe_text(q.name)} ({money(q.final_total_brl)})" for q in quotes
+        f"{safe_text(q.name)} ({money(q.final_total_brl)}"
+        + (f", {promotion_label(q)}" if q.promotion_percent is not None else "")
+        + ")"
+        for q in quotes
     )
     return f"Opções disponíveis parecidas: {options}."
 
@@ -217,7 +288,12 @@ def render_card(quote: ProductQuote) -> str:
             f"- Crédito: até {quote.max_installments}x sem juros, total de {total}"
         )
     else:
-        lines.append(f"- Crédito: {total}; parcelar neste valor depende da loja")
+        count = max_small_installments(quote.final_total_brl)
+        lines.append(
+            f"- Crédito: até {count}x sem juros, total de {total}"
+            if count
+            else f"- Crédito: {total}; parcelar neste valor depende da loja"
+        )
     return "\n".join(lines)
 
 
@@ -336,6 +412,8 @@ def compose(results, displayed_ids: tuple[int, ...], pending, notes=()) -> str:
                 completed.append(render_guide(result.data))
             elif isinstance(result.data, CatalogData):
                 products = result.data.products
+                if result.data.notice:
+                    completed.append(result.data.notice)
                 exploring = all(q.payment_method is None for q in products)
                 card = exploring and result.data.total_matches == 1
                 if card:
@@ -424,7 +502,7 @@ def compose(results, displayed_ids: tuple[int, ...], pending, notes=()) -> str:
     if any(q.payment_method == "credit" and q.installments is None for q in quotes):
         # Stated once per response rather than on every listed product.
         notes = (*notes, SMALL_INSTALLMENTS_NOTE)
-    blocks = completed + limitations + list(notes)
+    blocks = completed + list(dict.fromkeys(limitations)) + list(notes)
     blocks.extend(dict.fromkeys(footers))
     if pending:
         # One focused question at a time; other waiting operations are announced.

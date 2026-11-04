@@ -139,7 +139,7 @@ def test_real_installments_still_block_pix(demo):
 # Items 5 and 6, and related promotion filters.
 def test_other_model_of_the_brand_is_not_shown_as_promoted(demo):
     response = turn(demo, POLICY, message="o Crafter D-8 está em promoção?")
-    assert response.results[0].reason_code == "NO_ACTIVE_PROMOTION"
+    assert "não está em promoção ativa" in response.text
     assert "HT-100" not in response.text
 
 

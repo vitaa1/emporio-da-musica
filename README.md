@@ -180,7 +180,7 @@ General policy questions take a separate route: a second model call receives the
 
 The manual is ambiguous or incomplete in several places. The prototype handles them like this:
 
-- **Installments:** the detailed §3.1 bands take precedence over the summary table: 4–6x requires at least BRL 80 per installment, and 7–12x at least BRL 100. The 2–3x band and combined payments require confirmation.
+- **Installments:** the detailed §3.1 bands take precedence over the summary table: 4–6x requires at least BRL 80 per installment, and 7–12x at least BRL 100. The 2–3x band is quoted when each installment is at least BRL 100, which satisfies every reading of the manual, and requires confirmation below that. Combined payments state the BRL 2,000 threshold, and the split requires confirmation.
 - **Rounding:** PIX and promotional unit prices round half-up to cents. Any installment remainder goes in the first installment.
 - **Freight:** only Campo Grande/MS is quoted, because the manual does not list the metropolitan municipalities. Exactly BRL 500 requires confirmation, because the manual covers only above and below that value.
 - **Preference exchange:** the deadline's starting event is not stated, so the case is reported for store review.
@@ -201,7 +201,7 @@ The manual is ambiguous or incomplete in several places. The prototype handles t
 .venv/bin/python -m ruff format --check .
 ```
 
-The 647 deterministic tests need no model or credentials. They run in CI on Linux, Windows, and macOS.
+The 725 deterministic tests need no model or credentials. They run in CI on Linux, Windows, and macOS.
 
 On 2026-11-03, a clean copy of this documentation's working tree was verified on WSL2 with Python 3.13 in a new virtual environment: installing the pins, the data validation, the offline commands, and the model example under Quick start all worked, as did the checks above. The Quick start's PowerShell commands were also run manually on Windows with a fresh clone. A single example run does not guarantee identical model output later.
 
@@ -211,7 +211,7 @@ Model behavior is evaluated separately, because it depends on a local server and
 .venv/bin/python -m evals.suite --url http://localhost:11434 --output /tmp/emporio-evaluation.json
 ```
 
-The latest recorded run passed 48 of 48 turns across 19 scenarios. The cases were informed by development, so this is a regression check rather than an independent accuracy measure. [The evaluation report](docs/AGENT_EVALUATION.md) keeps the earlier failing runs and their corrections, including one provider error whose cause was not determined.
+The latest recorded run passed 49 of 49 turns across 19 scenarios. The cases were informed by development, so this is a regression check rather than an independent accuracy measure. [The evaluation report](docs/AGENT_EVALUATION.md) keeps the earlier failing runs and their corrections, including one provider error whose cause was not determined.
 
 ## Known limitations
 
@@ -221,6 +221,7 @@ The latest recorded run passed 48 of 48 turns across 19 scenarios. The cases wer
 - **Some policy answers are incomplete.** "Como funciona o frete?" can omit that the BRL 500 rule applies only to the metropolitan region, and "posso trocar se não gostar?" asks for an order number before explaining the rule.
 - **Routing relies partly on word lists.** Python corrects known routing mistakes for policy topics, promotions, and instruments outside the catalog, so other wording can still be misrouted. When the model marks a policy answer as uncovered, only a reviewed summary is shown, so some valid questions get the out-of-scope message. Two questions in one message can lose one if the model proposes a single intent.
 - **The model can invent a selection.** A list position or quantity it proposes is not checked against the message, so a quote can refer to a product the customer did not pick. Spelling correction covers brand names only, and short name fragments can match inside longer words.
+- **Fixed answers cover clear questions only.** Common questions about payment methods, installments, refunds, return freight, mouthpieces, carrier deadlines, transport damage, price holds, campaign dates, and data deletion use reviewed text without the model. Other wording still depends on the model and can ask for facts already given.
 - **Policy prose is not proven correct.** Validators reject invented numbers, unknown sections, and claims of executed actions, but a misstated rule using valid numbers can pass. Warranty, store-hours, return-deadline, and discount-stacking questions use fixed reviewed summaries when they match.
 - **No transactions.** There is no basket, purchase, refund, or human handoff. "Adicione" quotes only the named product, and complaints are acknowledged with a clear statement that nothing was registered.
 - **No live data.** Stock and orders come from a snapshot, and there is no carrier integration. Freight outside Campo Grande is not quoted.

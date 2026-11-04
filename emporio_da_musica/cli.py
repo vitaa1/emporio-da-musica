@@ -6,8 +6,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .composer import safe_text
+from .composer import after_hours_notice, safe_text
 from .contracts.common import MAX_MESSAGE_LENGTH
+from .contracts.dates import store_now
 from .controller import Controller
 from .data.loader import DataError, load_snapshot
 from .providers.demo import DemoProvider
@@ -88,8 +89,13 @@ def run_cli(controller, source, destination):
             f"Sessão de demonstração do cliente simulado {customer_id}; "
             "isto não é autenticação real.\n"
         )
+    closed_notice_shown = False
     try:
         while True:
+            notice = after_hours_notice(store_now(controller.clock))
+            if notice and not closed_notice_shown:
+                destination.write(notice + "\n")
+            closed_notice_shown = notice is not None
             destination.write("> ")
             destination.flush()
             line = source.readline(MAX_MESSAGE_LENGTH + 2)

@@ -265,7 +265,7 @@ Como funciona a garantia dos instrumentos?
 Assistant:
 
 ```text
-Segundo o manual da loja, a garantia legal é de 90 dias contra defeitos de fabricação, contados do recebimento. A garantia adicional do fabricante varia; consulte o prazo e as condições no certificado do instrumento. O manual exclui desgaste natural, mau uso, quedas, condições climáticas extremas, modificações ou reparos não autorizados e danos estéticos que não afetem o funcionamento. Isso não confirma cobertura de um caso individual. (Manual da loja, seção 8.1, 8.2, 8.3.)
+Segundo o manual da loja, a garantia legal é de 90 dias contra defeitos de fabricação, contados do recebimento. A maioria dos fabricantes oferece garantia própria, que pode variar de 6 meses a 2 anos; o prazo e as condições de cada produto estão no certificado do instrumento. O manual exclui desgaste natural, mau uso, quedas, condições climáticas extremas, modificações ou reparos não autorizados e danos estéticos que não afetem o funcionamento. Isso não confirma cobertura de um caso individual. (Manual da loja, seção 8.1, 8.2, 8.3.)
 
 Explicação geral com base no manual da loja; casos específicos dependem dos dados do pedido e não foram aprovados aqui.
 ```
