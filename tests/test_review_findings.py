@@ -502,3 +502,96 @@ def test_hours_summary_mentions_special_dates(demo):
         "datas especiais"
         in turn(demo, POLICY, message="voces abrem na black friday?").text
     )
+
+
+# Manual testing: selecting from the list.
+def list_drums(demo):
+    return turn(demo, search("bateria"), message="quero comprar uma bateria")
+
+
+@pytest.mark.parametrize("message", ["3", "o 3", "número 3", "opção 3", "3º"])
+def test_bare_list_number_selects_without_the_model(demo, message):
+    list_drums(demo)
+    response = demo.handle(message)
+    assert "Yamaha Kit 3" in response.text and "Formas de pagamento" in response.text
+    assert len(demo.provider.requests) == 1
+
+
+def test_number_outside_the_list_goes_to_the_model(demo):
+    list_drums(demo)
+    demo.provider.responses.append({"intents": [search("bateria")]})
+    demo.handle("9")
+    assert len(demo.provider.requests) == 2
+
+
+def test_number_answering_a_quantity_question_is_not_a_position(demo):
+    list_drums(demo)
+    demo.handle("1")
+    assert "quantity" in demo.session.pending[0].requested_fields
+    demo.provider.responses.append(
+        {
+            "pending_id": demo.session.pending[0].pending_id,
+            "update": {"type": "payment_options", "quantity": 2},
+        }
+    )
+    demo.handle("2")
+    assert len(demo.provider.requests) == 2
+
+
+@pytest.mark.parametrize(
+    "message, expected",
+    [
+        ("bateria acustica yamaha kit 1 studio, pix", "R$ 4.217,05"),
+        ("yamaha kit 3, pix", "R$ 14.175,90"),
+    ],
+)
+def test_typed_name_overrides_an_invented_selection(demo, message, expected):
+    list_drums(demo)
+    response = turn(
+        demo,
+        payment(
+            product_reference={"kind": "selected"}, quantity=1, payment_method="pix"
+        ),
+        message=message,
+    )
+    assert expected in response.text
+
+
+def test_selection_is_kept_when_no_name_is_typed(demo):
+    turn(demo, search("Yamaha C70"), message="Yamaha C70")
+    response = turn(
+        demo,
+        payment(
+            product_reference={"kind": "selected"}, quantity=1, payment_method="pix"
+        ),
+        message="esse, uma unidade no pix",
+    )
+    assert "R$ 806,55" in response.text
+
+
+@pytest.mark.parametrize("message", ["1 unidade", "1", "uma unidade, 1 no pix"])
+def test_quantity_number_does_not_change_the_selected_product(demo, message):
+    list_drums(demo)
+    demo.handle("3")
+    pending = demo.session.pending
+    demo.provider.responses.append(
+        {"intents": [payment(product_reference={"kind": "selected"}, quantity=1)]}
+    )
+    response = demo.handle(message)
+    assert "Kit 1" not in response.text
+    assert pending
+
+
+def test_freight_confirmation_does_not_add_a_product_card(demo):
+    intent = {
+        "type": "shipping_quote",
+        "product_reference": {"kind": "query", "query": "Takamine GD20"},
+        "quantity": 1,
+        "destination": {"city": "Dourados", "state": "MS"},
+        "payment_method": "boleto",
+    }
+    response = turn(
+        demo, intent, message="frete do Takamine GD20 no boleto para Dourados"
+    )
+    assert [r.operation for r in response.results] == ["shipping_quote"]
+    assert "Formas de pagamento" not in response.text

@@ -1,8 +1,8 @@
 # Complete-agent evaluation
 
-After review on 2026-11-03, the latest recorded run passed **44/44 automated
-turn checks** across 18 scenarios. All marked manual-review turns passed the
-source comparison described below. **633 deterministic tests**, Ruff lint,
+After review on 2026-11-03, the latest recorded run passed **48/48 automated
+turn checks** across 19 scenarios. All marked manual-review turns passed the
+source comparison described below. **647 deterministic tests**, Ruff lint,
 and Ruff formatting passed locally. This is a small development evaluation,
 not a claim of general model reliability or production readiness.
 
@@ -37,6 +37,8 @@ The requirements were then probed with about 30 new messages. Ten problems appea
 
 Code, security, and end-to-end diagnostic reviews then ran on these changes, followed by one re-review of the fixes. They found problems the suite had missed, some introduced by the fixes: displaying model text marked as uncovered, quoting totals for discontinued products, budgets after the guided question returning nothing, `Bass 3X` read as installments, and promotions answered with another model. These were corrected with regression tests. No security vulnerability was confirmed in the re-review. The fixes after the re-review were not reviewed again.
 
+Further manual testing then found that a bare list number and a full typed product name did not select a product, because the model kept proposing a selection. Python now resolves both. Testing that fix with the real model also caught `1 unidade` switching to `Kit 1`, corrected before recording. Intermediate runs of `2026-11-03-requirements.json`, some with failures such as a freight turn showing a product card, were overwritten during this work and are described here rather than preserved.
+
 ## Method and preserved evidence
 
 Run [the versioned suite](../evals/README.md) explicitly against local Ollama.
@@ -60,7 +62,7 @@ evaluator, cases, prompts, manual, and demo CSVs to identify the tested state.
 | [First run after corrections](../evals/results/2026-11-03-reviewed.json) | 28/29 automated passes. The three original failures no longer occurred. One GD20 extraction produced a sanitized `ProviderError`; no quote was invented. The underlying provider cause was not established. |
 | [Verification before manual-testing fixes](../evals/results/2026-11-03-verified.json) | 29/29 automated passes, exit code 0, including the GD20 scenario. All marked manual reviews passed. |
 | [Guided-flow verification](../evals/results/2026-11-03-guided.json) | 36/36 automated passes, exit code 0, with the guided responses and three added scenarios. All marked manual reviews passed. |
-| [Latest verification](../evals/results/2026-11-03-requirements.json) | 44/44 automated passes, exit code 0, with three scenarios from the requirement probing. All marked manual reviews passed. |
+| [Latest verification](../evals/results/2026-11-03-requirements.json) | 48/48 automated passes, exit code 0, with scenarios from the requirement probing and manual testing. All marked manual reviews passed. |
 
 An earlier sandbox-blocked connection attempt produced only sanitized errors
 and is not counted as a model run. Recorded runs were performed after allowing
@@ -95,6 +97,7 @@ and policy calls where applicable, and are not a controlled latency benchmark.
 | `policy-recall` | 3/3 | Reviewed summaries for hours, return deadlines, and stacking |
 | `promotions` | 2/2 | Two active ukulele promotions; none for the Fender Stratocaster |
 | `catalog-and-scope` | 3/3 | No violin found, joke out of scope, persona answer |
+| `list-selection` | 4/4 | A bare list number selects Kit 3, and quantity and PIX keep it: BRL 14,175.90 |
 
 The assistant compared every marked response in the latest artifact with the
 supplied manual or Python arithmetic. This is source-grounding review, not legal

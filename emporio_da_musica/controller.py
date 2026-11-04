@@ -24,11 +24,13 @@ from .contracts.intents import (
     Complaint,
     IntentTurn,
     OrderStatus,
+    OrdinalReference,
     OutOfScope,
     PaymentOptions,
     PolicyQuestion,
     ProductSearch,
     ProposalError,
+    QueryReference,
     RequestTooBroadError,
     ReturnAssessment,
     ShippingQuote,
@@ -141,6 +143,9 @@ SOCIAL_WORDS = re.compile(
 IDENTITY_QUESTION = re.compile(
     r"\b(quem e voce|quem e vc|quem es|qual (e )?o? ?seu nome|com quem (eu )?falo"
     r"|voce e (um )?(robo|humano|uma pessoa|uma ia))\b"
+)
+LIST_NUMBER = re.compile(
+    r"(?:(?:o|a|opcao|numero|n|item|produto) )?([0-9]{1,2}) ?[oaºª]?"
 )
 OTHER_METHOD = re.compile(r"\b(pix|boleto|debito)\b")
 # After a brand: an unknown next word is a model the promotion must not stand in for.
@@ -704,7 +709,9 @@ class Controller:
             ),
         )
         try:
-            proposal = extract_proposal(self.provider, request, clock=self.clock)
+            proposal = self._direct_choice(message) or extract_proposal(
+                self.provider, request, clock=self.clock
+            )
         except RequestTooBroadError:
             return self._finish(message, "Faça até cinco pedidos por mensagem.")
         except ProviderConnectionError as error:
@@ -812,6 +819,20 @@ class Controller:
                     notes.append(SEARCH_FILTER_DROPPED)
             if isinstance(intent, QUOTES) and _payment_only(intent.product_reference):
                 intent = intent.model_copy(update={"product_reference": None})
+            if isinstance(intent, QUOTES) and (
+                intent.product_reference is None
+                or intent.product_reference.kind == "selected"
+            ):
+                # A name in the message outranks a selection the model assumed.
+                typed_name = self._typed_product_name(message)
+                if typed_name:
+                    intent = intent.model_copy(
+                        update={
+                            "product_reference": QueryReference(
+                                kind="query", query=typed_name
+                            )
+                        }
+                    )
             checked.append(intent)
         intents = checked
         # Facts carried in a merged clarification were checked when first supplied;
@@ -882,7 +903,7 @@ class Controller:
                 unique_quote = (
                     choices.data.total_matches == 1
                     and resolved == choices.data.products[0].product_id
-                    and outcome.status == "success"
+                    and outcome.status in ("success", "requires_confirmation")
                     and isinstance(outcome, (PaymentOptionsResult, ShippingQuoteResult))
                 )
                 if choices is not outcome and not unique_quote:
@@ -1229,6 +1250,48 @@ class Controller:
             # Reused facts are announced so a discount is never applied silently.
             self._reused_quote = True
         return type(intent).model_validate(intent.model_dump() | changes)
+
+    def _direct_choice(self, message):
+        """A bare list number is unambiguous, so it needs no interpretation."""
+        match = LIST_NUMBER.fullmatch(normalize(message))
+        pending = self.session.pending
+        if (
+            match is None
+            or not 1 <= int(match.group(1)) <= len(self.session.displayed_product_ids)
+            or (pending and "product_reference" not in pending[0].requested_fields)
+        ):
+            return None
+        return IntentTurn(
+            intents=[
+                PaymentOptions(
+                    type="payment_options",
+                    product_reference=OrdinalReference(
+                        kind="ordinal", ordinal=int(match.group(1))
+                    ),
+                )
+            ]
+        )
+
+    def _typed_product_name(self, message):
+        """The one product identified by the name words typed, or None."""
+        products = self.snapshot.products
+        vocabulary = {w for p in products.values() for w in _words(p.name)}
+        typed = (set(_words(message)) & vocabulary) - set(INSTRUMENT_CATEGORIES)
+        # A number alone is a quantity or a position, never a product name.
+        if all(word.isdigit() for word in typed):
+            return None
+
+        def matches(ids):
+            return [i for i in ids if typed <= set(_words(products[i].name))]
+
+        shown = matches(self.session.displayed_product_ids)
+        if len(shown) == 1:
+            return products[shown[0]].name
+        # Outside the current list, one common word is not enough to identify it.
+        anywhere = matches(products)
+        if len(typed) >= 2 and len(anywhere) == 1:
+            return products[anywhere[0]].name
+        return None
 
     def _unavailable_product(self, outcome, resolved):
         if outcome.status == "unavailable" and resolved is not None:

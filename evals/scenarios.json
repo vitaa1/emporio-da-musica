@@ -719,5 +719,93 @@
         "manual_review": "States the store's assistant role."
       }
     ]
+  },
+  {
+    "id": "list-selection",
+    "customer_id": null,
+    "origin": "manual testing feedback; messages that failed on 2026-11-03",
+    "turns": [
+      {
+        "message": "quero comprar uma bateria",
+        "expected": [
+          {
+            "operation": "product_search",
+            "status": "success",
+            "data": {
+              "total_matches": 3
+            }
+          }
+        ],
+        "optional_results": [
+          {
+            "operation": "payment_options",
+            "status": "needs_information"
+          }
+        ],
+        "manual_review": null
+      },
+      {
+        "message": "3",
+        "expected": [
+          {
+            "operation": "payment_options",
+            "status": "needs_information"
+          }
+        ],
+        "optional_results": [
+          {
+            "operation": "product_search",
+            "status": "success",
+            "data": {
+              "products": [
+                {
+                  "name": "Bateria Acústica Yamaha Kit 3 Studio"
+                }
+              ]
+            }
+          }
+        ],
+        "manual_review": null
+      },
+      {
+        "message": "1 unidade",
+        "expected": [
+          {
+            "operation": "payment_options",
+            "status": "needs_information"
+          }
+        ],
+        "optional_results": [
+          {
+            "operation": "product_search",
+            "status": "success",
+            "data": {
+              "products": [
+                {
+                  "name": "Bateria Acústica Yamaha Kit 3 Studio"
+                }
+              ]
+            }
+          }
+        ],
+        "manual_review": null
+      },
+      {
+        "message": "pix",
+        "expected": [
+          {
+            "operation": "payment_options",
+            "status": "success",
+            "data": {
+              "name": "Bateria Acústica Yamaha Kit 3 Studio",
+              "quantity": 1,
+              "payment_method": "pix",
+              "final_total_brl": "14175.90"
+            }
+          }
+        ],
+        "manual_review": null
+      }
+    ]
   }
 ]

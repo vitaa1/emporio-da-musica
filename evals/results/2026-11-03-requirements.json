@@ -1,5 +1,5 @@
 {
-  "started_at": "2026-11-04T01:02:43.145149+00:00",
+  "started_at": "2026-11-04T01:16:51.730666+00:00",
   "model": "qwen2.5:3b",
   "configuration": {
     "temperature": 0,
@@ -11,7 +11,7 @@
   "usage": "Not exposed by the provider adapter",
   "scope": "End-to-end outcomes, not isolated raw extraction accuracy; manual policy review remains required",
   "hashes": {
-    "evals/scenarios.json": "c1ac98ca0f0dd8515b853fd1ad26d50709ec19fba6f75db5438ffcedf09a5904",
+    "evals/scenarios.json": "9a0e26dfd820fdb1a12fd2c1f835fe5aa808498c6a177966b4ef4186f47736af",
     "evals/suite.py": "61360928855b41060e8819b2692e242140c0438515ef099f036b1e861f3a40e4",
     "emporio_da_musica/__init__.py": "e4956db4dbbd460188dda7dd5f677837bae5b0d421fb2d829c57433bfbf8e069",
     "emporio_da_musica/__main__.py": "a18594bcae479439b9dd26e1b0234a6230db291bbb5a69855d4e1fc5dbcbc462",
@@ -24,7 +24,7 @@
     "emporio_da_musica/contracts/intents.py": "a16393b83b94b4d37352563403dfc7855791a8ced8de43a6074842c7ec3a9b1a",
     "emporio_da_musica/contracts/results.py": "bd69961fb1f219a8e89d18bbeefe27abdbb387df8f861038505b05822cf4bf10",
     "emporio_da_musica/contracts/session.py": "677fde4e860dbffc66620e4ce62210b4e8f115838734fe87800e26a54a803496",
-    "emporio_da_musica/controller.py": "8473507e8711cded1b0b02cce84f0ecc636a986e270738fea56dbf2974d5dd95",
+    "emporio_da_musica/controller.py": "9d27edc897a779dede394d36d3b1b71e21969674483e432c2c967a7a08873f45",
     "emporio_da_musica/data/__init__.py": "dfb373daf080273ef62d3708c8ddbc08fbe783a0938dd8db2a302e702d40b50d",
     "emporio_da_musica/data/loader.py": "6f0526d961a56deeae62112a3333effdf1d79e9428af684375302b5595431542",
     "emporio_da_musica/data/records.py": "ae606c8bc0f3fac54d97b559c0abb49520cb56f1b46602d21bc61650c7b5b233",
@@ -222,7 +222,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.129,
+          "seconds": 2.41,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -274,7 +274,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.421,
+          "seconds": 2.805,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -326,7 +326,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.196,
+          "seconds": 2.569,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -381,7 +381,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.425,
+          "seconds": 1.612,
           "manual_review": null,
           "manual_status": "not_requested"
         }
@@ -442,7 +442,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.021,
+          "seconds": 2.334,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -499,7 +499,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.587,
+          "seconds": 3.151,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -529,7 +529,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 3.002,
+          "seconds": 3.68,
           "manual_review": null,
           "manual_status": "not_requested"
         }
@@ -619,7 +619,7 @@
           ],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.876,
+          "seconds": 2.348,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -671,7 +671,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.127,
+          "seconds": 2.781,
           "manual_review": null,
           "manual_status": "not_requested"
         }
@@ -714,7 +714,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 0.918,
+          "seconds": 1.193,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -741,7 +741,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.164,
+          "seconds": 1.529,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -768,7 +768,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 0.955,
+          "seconds": 1.203,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -797,7 +797,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 0.764,
+          "seconds": 0.91,
           "manual_review": null,
           "manual_status": "not_requested"
         }
@@ -831,7 +831,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 0.944,
+          "seconds": 1.132,
           "manual_review": null,
           "manual_status": "not_requested"
         }
@@ -871,7 +871,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.597,
+          "seconds": 1.93,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -902,7 +902,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.948,
+          "seconds": 2.323,
           "manual_review": null,
           "manual_status": "not_requested"
         }
@@ -943,7 +943,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.835,
+          "seconds": 3.315,
           "manual_review": "Compare every claim and section with manual §2: Saturday 09:00–13:00; no unsupported opening claim.",
           "manual_status": "pending"
         },
@@ -981,7 +981,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 3.501,
+          "seconds": 4.09,
           "manual_review": "Compare claims with §8; manufacturer-specific duration must remain unknown.",
           "manual_status": "pending"
         },
@@ -1008,7 +1008,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.761,
+          "seconds": 2.115,
           "manual_review": null,
           "manual_status": "not_requested"
         }
@@ -1047,7 +1047,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.012,
+          "seconds": 1.234,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -1079,7 +1079,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.155,
+          "seconds": 2.568,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -1108,7 +1108,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.33,
+          "seconds": 1.558,
           "manual_review": "Acknowledges complaint and explicitly avoids claiming registration or forwarding.",
           "manual_status": "pending"
         }
@@ -1186,7 +1186,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 4.115,
+          "seconds": 4.968,
           "manual_review": "Check exact catalog price and Saturday 09:00–13:00 with §2; both questions must be answered.",
           "manual_status": "pending"
         }
@@ -1245,7 +1245,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.424,
+          "seconds": 2.894,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -1328,7 +1328,7 @@
           ],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.9,
+          "seconds": 2.18,
           "manual_review": "Must ask payment for Crafter; no basket or completed purchase claim.",
           "manual_status": "pending"
         },
@@ -1381,7 +1381,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.395,
+          "seconds": 2.888,
           "manual_review": null,
           "manual_status": "not_requested"
         }
@@ -1441,7 +1441,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.188,
+          "seconds": 2.909,
           "manual_review": "No stacked PIX discount or completed purchase claim.",
           "manual_status": "pending"
         }
@@ -1501,7 +1501,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.95,
+          "seconds": 2.631,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -1530,7 +1530,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.274,
+          "seconds": 1.61,
           "manual_review": "Ask which payment method to use; do not silently retain credit or apply PIX.",
           "manual_status": "pending"
         }
@@ -1587,7 +1587,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.209,
+          "seconds": 2.476,
           "manual_review": "Asks for brand or budget; brands and price range match the catalog.",
           "manual_status": "pending"
         },
@@ -1758,7 +1758,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.363,
+          "seconds": 1.533,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -1837,7 +1837,7 @@
           ],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.004,
+          "seconds": 2.238,
           "manual_review": "Shows C70 stock, unit price, and every payment option.",
           "manual_status": "pending"
         },
@@ -1889,7 +1889,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.357,
+          "seconds": 2.651,
           "manual_review": null,
           "manual_status": "not_requested"
         }
@@ -2134,7 +2134,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.352,
+          "seconds": 2.67,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -2349,7 +2349,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.386,
+          "seconds": 2.662,
           "manual_review": null,
           "manual_status": "not_requested"
         }
@@ -2415,7 +2415,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.384,
+          "seconds": 2.704,
           "manual_review": "Payment options match the unit price; PIX is 5% lower.",
           "manual_status": "pending"
         }
@@ -2456,7 +2456,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 5.851,
+          "seconds": 6.599,
           "manual_review": "Says the store is closed on Sundays.",
           "manual_status": "pending"
         },
@@ -2494,7 +2494,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 3.365,
+          "seconds": 3.611,
           "manual_review": "Reviewed summary of §§4.1–4.3.",
           "manual_status": "pending"
         },
@@ -2528,7 +2528,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 4.511,
+          "seconds": 5.135,
           "manual_review": "Says discounts do not stack.",
           "manual_status": "pending"
         }
@@ -2612,7 +2612,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.863,
+          "seconds": 2.151,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -2641,7 +2641,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.17,
+          "seconds": 1.38,
           "manual_review": null,
           "manual_status": "not_requested"
         }
@@ -2675,7 +2675,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 2.084,
+          "seconds": 2.51,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -2704,7 +2704,7 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 0.754,
+          "seconds": 0.962,
           "manual_review": null,
           "manual_status": "not_requested"
         },
@@ -2733,13 +2733,341 @@
           "optional_results": [],
           "automated_pass": true,
           "failures": [],
-          "seconds": 1.092,
+          "seconds": 1.327,
           "manual_review": "States the store's assistant role.",
           "manual_status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "list-selection",
+      "customer_id": null,
+      "origin": "manual testing feedback; messages that failed on 2026-11-03",
+      "turns": [
+        {
+          "turn": 1,
+          "message": "quero comprar uma bateria",
+          "response": "1. Bateria Acústica Yamaha Kit 1 Studio — R$ 4.439,00\n2. Bateria Acústica Pearl Kit 2 Studio — R$ 13.285,00\n3. Bateria Acústica Yamaha Kit 3 Studio — R$ 14.922,00\nQual modelo te interessa?\n\nNada foi comprado ou reservado; valores do catálogo da loja.\n\nPara continuar, informe o produto (nome ou número da lista), a quantidade, a forma de pagamento.",
+          "results": [
+            {
+              "status": "success",
+              "data": {
+                "products": [
+                  {
+                    "product_id": 139,
+                    "name": "Bateria Acústica Yamaha Kit 1 Studio",
+                    "quantity": 1,
+                    "availability": "available",
+                    "list_unit_price_brl": "4439",
+                    "promotion_percent": null,
+                    "payment_method": null,
+                    "installments": null,
+                    "final_total_brl": "4439.00",
+                    "assumptions": [
+                      "Unit-price inquiry: quantity 1.",
+                      "Payment unspecified: list or active promotional price; no PIX discount."
+                    ],
+                    "installment_amount_brl": null,
+                    "first_installment_brl": null,
+                    "max_installments": 12,
+                    "stock_quantity": 8,
+                    "pix_total_brl": "4217.05"
+                  },
+                  {
+                    "product_id": 140,
+                    "name": "Bateria Acústica Pearl Kit 2 Studio",
+                    "quantity": 1,
+                    "availability": "available",
+                    "list_unit_price_brl": "13285",
+                    "promotion_percent": null,
+                    "payment_method": null,
+                    "installments": null,
+                    "final_total_brl": "13285.00",
+                    "assumptions": [
+                      "Unit-price inquiry: quantity 1.",
+                      "Payment unspecified: list or active promotional price; no PIX discount."
+                    ],
+                    "installment_amount_brl": null,
+                    "first_installment_brl": null,
+                    "max_installments": 12,
+                    "stock_quantity": 7,
+                    "pix_total_brl": "12620.75"
+                  },
+                  {
+                    "product_id": 141,
+                    "name": "Bateria Acústica Yamaha Kit 3 Studio",
+                    "quantity": 1,
+                    "availability": "available",
+                    "list_unit_price_brl": "14922",
+                    "promotion_percent": null,
+                    "payment_method": null,
+                    "installments": null,
+                    "final_total_brl": "14922.00",
+                    "assumptions": [
+                      "Unit-price inquiry: quantity 1.",
+                      "Payment unspecified: list or active promotional price; no PIX discount."
+                    ],
+                    "installment_amount_brl": null,
+                    "first_installment_brl": null,
+                    "max_installments": 12,
+                    "stock_quantity": 8,
+                    "pix_total_brl": "14175.90"
+                  }
+                ],
+                "total_matches": 3,
+                "guide": null
+              },
+              "missing_fields": [],
+              "reason_code": null,
+              "policy_references": [
+                "3",
+                "6"
+              ],
+              "operation": "product_search"
+            },
+            {
+              "status": "needs_information",
+              "data": null,
+              "missing_fields": [
+                "product_reference",
+                "quantity",
+                "payment_method"
+              ],
+              "reason_code": "QUOTE_FACTS_MISSING",
+              "policy_references": [],
+              "operation": "payment_options"
+            }
+          ],
+          "expected": [
+            {
+              "operation": "product_search",
+              "status": "success",
+              "data": {
+                "total_matches": 3
+              }
+            }
+          ],
+          "optional_results": [
+            {
+              "operation": "payment_options",
+              "status": "needs_information"
+            }
+          ],
+          "automated_pass": true,
+          "failures": [],
+          "seconds": 2.23,
+          "manual_review": null,
+          "manual_status": "not_requested"
+        },
+        {
+          "turn": 2,
+          "message": "3",
+          "response": "3. Bateria Acústica Yamaha Kit 3 Studio\nEm estoque: 8 unidade(s).\nPreço por unidade: R$ 14.922,00.\nFormas de pagamento:\n- PIX: R$ 14.175,90 (5% de desconto)\n- Débito: R$ 14.922,00\n- Boleto: R$ 14.922,00\n- Crédito: até 12x sem juros, total de R$ 14.922,00\n\nNada foi comprado ou reservado; valores do catálogo da loja.\n\nPara continuar, informe a quantidade, a forma de pagamento.",
+          "results": [
+            {
+              "status": "success",
+              "data": {
+                "products": [
+                  {
+                    "product_id": 141,
+                    "name": "Bateria Acústica Yamaha Kit 3 Studio",
+                    "quantity": 1,
+                    "availability": "available",
+                    "list_unit_price_brl": "14922",
+                    "promotion_percent": null,
+                    "payment_method": null,
+                    "installments": null,
+                    "final_total_brl": "14922.00",
+                    "assumptions": [
+                      "Unit-price inquiry: quantity 1.",
+                      "Payment unspecified: list or active promotional price; no PIX discount."
+                    ],
+                    "installment_amount_brl": null,
+                    "first_installment_brl": null,
+                    "max_installments": 12,
+                    "stock_quantity": 8,
+                    "pix_total_brl": "14175.90"
+                  }
+                ],
+                "total_matches": 1,
+                "guide": null
+              },
+              "missing_fields": [],
+              "reason_code": null,
+              "policy_references": [
+                "3",
+                "6"
+              ],
+              "operation": "product_search"
+            },
+            {
+              "status": "needs_information",
+              "data": null,
+              "missing_fields": [
+                "quantity",
+                "payment_method"
+              ],
+              "reason_code": "QUOTE_FACTS_MISSING",
+              "policy_references": [],
+              "operation": "payment_options"
+            }
+          ],
+          "expected": [
+            {
+              "operation": "payment_options",
+              "status": "needs_information"
+            }
+          ],
+          "optional_results": [
+            {
+              "operation": "product_search",
+              "status": "success",
+              "data": {
+                "products": [
+                  {
+                    "name": "Bateria Acústica Yamaha Kit 3 Studio"
+                  }
+                ]
+              }
+            }
+          ],
+          "automated_pass": true,
+          "failures": [],
+          "seconds": 0.0,
+          "manual_review": null,
+          "manual_status": "not_requested"
+        },
+        {
+          "turn": 3,
+          "message": "1 unidade",
+          "response": "3. Bateria Acústica Yamaha Kit 3 Studio\nEm estoque: 8 unidade(s).\nPreço por unidade: R$ 14.922,00.\nFormas de pagamento:\n- PIX: R$ 14.175,90 (5% de desconto)\n- Débito: R$ 14.922,00\n- Boleto: R$ 14.922,00\n- Crédito: até 12x sem juros, total de R$ 14.922,00\n\nNada foi comprado ou reservado; valores do catálogo da loja.\n\nPara continuar, informe a forma de pagamento.",
+          "results": [
+            {
+              "status": "success",
+              "data": {
+                "products": [
+                  {
+                    "product_id": 141,
+                    "name": "Bateria Acústica Yamaha Kit 3 Studio",
+                    "quantity": 1,
+                    "availability": "available",
+                    "list_unit_price_brl": "14922",
+                    "promotion_percent": null,
+                    "payment_method": null,
+                    "installments": null,
+                    "final_total_brl": "14922.00",
+                    "assumptions": [
+                      "Payment unspecified: list or active promotional price; no PIX discount."
+                    ],
+                    "installment_amount_brl": null,
+                    "first_installment_brl": null,
+                    "max_installments": 12,
+                    "stock_quantity": 8,
+                    "pix_total_brl": "14175.90"
+                  }
+                ],
+                "total_matches": 1,
+                "guide": null
+              },
+              "missing_fields": [],
+              "reason_code": null,
+              "policy_references": [
+                "3",
+                "6"
+              ],
+              "operation": "product_search"
+            },
+            {
+              "status": "needs_information",
+              "data": null,
+              "missing_fields": [
+                "payment_method"
+              ],
+              "reason_code": "QUOTE_FACTS_MISSING",
+              "policy_references": [],
+              "operation": "payment_options"
+            }
+          ],
+          "expected": [
+            {
+              "operation": "payment_options",
+              "status": "needs_information"
+            }
+          ],
+          "optional_results": [
+            {
+              "operation": "product_search",
+              "status": "success",
+              "data": {
+                "products": [
+                  {
+                    "name": "Bateria Acústica Yamaha Kit 3 Studio"
+                  }
+                ]
+              }
+            }
+          ],
+          "automated_pass": true,
+          "failures": [],
+          "seconds": 2.974,
+          "manual_review": null,
+          "manual_status": "not_requested"
+        },
+        {
+          "turn": 4,
+          "message": "pix",
+          "response": "3. Bateria Acústica Yamaha Kit 3 Studio — disponível para a quantidade solicitada. Preço de tabela por unidade: R$ 14.922,00. Desconto PIX: 5%. Total para 1 unidade(s): R$ 14.175,90 (PIX).\n\nUsei dados já informados na cotação anterior deste produto; informe outros se quiser mudar.\n\nNada foi comprado ou reservado; valores do catálogo da loja.",
+          "results": [
+            {
+              "status": "success",
+              "data": {
+                "product_id": 141,
+                "name": "Bateria Acústica Yamaha Kit 3 Studio",
+                "quantity": 1,
+                "availability": "available",
+                "list_unit_price_brl": "14922",
+                "promotion_percent": null,
+                "payment_method": "pix",
+                "installments": null,
+                "final_total_brl": "14175.90",
+                "assumptions": [],
+                "installment_amount_brl": null,
+                "first_installment_brl": null,
+                "max_installments": null,
+                "stock_quantity": null,
+                "pix_total_brl": null
+              },
+              "missing_fields": [],
+              "reason_code": null,
+              "policy_references": [
+                "3",
+                "6"
+              ],
+              "operation": "payment_options"
+            }
+          ],
+          "expected": [
+            {
+              "operation": "payment_options",
+              "status": "success",
+              "data": {
+                "name": "Bateria Acústica Yamaha Kit 3 Studio",
+                "quantity": 1,
+                "payment_method": "pix",
+                "final_total_brl": "14175.90"
+              }
+            }
+          ],
+          "optional_results": [],
+          "automated_pass": true,
+          "failures": [],
+          "seconds": 2.747,
+          "manual_review": null,
+          "manual_status": "not_requested"
         }
       ]
     }
   ],
   "complete": true,
-  "finished_at": "2026-11-04T01:04:22.776383+00:00"
+  "finished_at": "2026-11-04T01:18:54.407693+00:00"
 }
