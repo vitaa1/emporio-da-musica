@@ -30,7 +30,7 @@ Windows-hosted Ollama is reachable from WSL at the Windows host address (`ip rou
 
 ## Current project status
 
-- `fix/store-policy-compliance` aligns responses with the manual: original price on promotional lines (§6.2), inactive promotions stated with the current price (§7.3), after-hours notice in the CLI (§7.1), manufacturer warranty range (§8.2), combined-payment threshold and safe 2–3x quotes (§3.1), plus direct Python routes for clear questions, accessories, and freight: 725 tests, 49/49 turns in `evals/results/2026-11-04-policy.json`.
+- `fix/store-policy-compliance` aligns responses with the manual: original price on promotional lines (§6.2), inactive promotions stated with the current price (§7.3), after-hours notice in the CLI (§7.1), manufacturer warranty range (§8.2), combined-payment threshold and safe 2–3x quotes (§3.1), plus direct Python routes for clear questions, accessories, and freight: 761 tests, 49/49 turns in `evals/results/2026-11-04-policy-reviewed.json`.
 - `fix/agent-requirement-gaps` corrects gaps from requirement probing and reviews: 647 tests, 48/48 turns in `evals/results/2026-11-03-requirements.json`.
 - PR #37 (final README, split guides) is merged. `fix/catalog-search-terms` adds search-term checks, a startup server check, and the guided purchase flow: 535 tests, 36/36 evaluation turns in `evals/results/2026-11-03-guided.json`.
 - P13 (#21) merged through PR #36 at `b1bcde7`; CI passed on all three platforms. P14 (#22) is in progress on `docs/final-readme-submission`. P13 delivered a versioned 12-scenario evaluator, preserved before/after runs, five real conversations, and a review report. See `docs/AGENT_EVALUATION.md`. All 489 offline tests and Ruff checks pass.

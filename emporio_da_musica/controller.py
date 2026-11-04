@@ -300,6 +300,13 @@ def _rerouted_search(snapshot, intent, message, guided_category, intent_count):
     return intent
 
 
+def _over_installment_limit(message):
+    return any(
+        int(count) > MAX_INSTALLMENTS
+        for count in INSTALLMENT_COUNT.findall(normalize(message))
+    )
+
+
 def _named_campaigns(message):
     """Campaigns named in the message, as normalized keys."""
     text = normalize(message)
@@ -552,7 +559,8 @@ ACCESSORY_WORDS = re.compile(
     r"\bacessorios?\b|\bencordoamentos?\b|\bpalhetas?\b|\bpedaleiras?\b"
     r"|\bamplificador(?:es)?\b|\bpedais\b(?! de bateria)"
     r"|\bpedal (?:de (?!bateria\b)\w+|para guitarra|pra guitarra)\b"
-    r"|(?<![0-9] )\bcordas?\b(?! orquestra)"
+    # "com cordas de nylon" and "seis cordas" describe an instrument.
+    r"|(?<![0-9] )(?<!com )(?<!cinco )(?<!seis )(?<!sete )\bcordas?\b(?! orquestra)"
     r"|\b(?:cabos|capas|cases)\b(?! d[oa]s? )"
     r"|\b(?:cabo|capa|case) (?:de|para|pra|p10|p2)\b"
 )
@@ -564,8 +572,9 @@ BARE_INSTRUMENT_QUESTION = re.compile(
     r"(?:voces )?(?:tem|vende|vendem) (?:uma? |algum |alguma )?(\w+)"
 )
 COMBINED_WORDING = re.compile(
-    r"\b(?:metade|parte (?:no|na|em)|pix (?:\+|mais) (?:\w+ ){0,2}cartao"
-    r"|cartao (?:\+|mais) (?:\w+ ){0,2}pix|dois cartoes)\b"
+    r"\b(?:(?:metade|parte) (?:no|na|em) (?:pix|cartao|credito|debito|boleto)"
+    r"|pix (?:\+|mais) (?:no |o )?cartao|cartao (?:\+|mais) (?:no |o )?pix"
+    r"|dois cartoes)\b"
 )
 INSTALLMENT_COUNT = re.compile(r"\b([0-9]+) ?(?:x|vezes|parcelas)\b")
 MAX_INSTALLMENTS = 12
@@ -573,10 +582,24 @@ FREIGHT_REQUEST = re.compile(r"\bfrete\b", re.IGNORECASE)
 # The destination closes the message: "... para Campo Grande/MS?".
 FREIGHT_DESTINATION = re.compile(
     r"\s(?:para|pra)\s+([^\W\d_]+(?:\s[^\W\d_]+){0,3}?)"
-    r"(?:\s*[/-]\s*([A-Za-z]{2})|\s+([A-Z]{2}))?\s*[?.!]*$"
+    r"(?:\s*[/-]\s*([A-Za-z]{2})|\s+([A-Za-z]{2}))?\s*[?.!]*$"
 )
+# Not "em 3x", "D-8", or the "7 Cordas" of a product name.
 FREIGHT_QUANTITY = re.compile(
-    r"\b(?:de|do|da|dos|das|frete|quero)\s+([0-9]{1,3})\b(?!\s*x|-)", re.IGNORECASE
+    r"\b(?:de|do|da|dos|das|frete|quero)\s+([0-9][0-9.,]*)\b(?!\s*x|-|\s*cordas)",
+    re.IGNORECASE,
+)
+# Anything else about quantity is left to the model instead of assuming one unit.
+FREIGHT_UNCLEAR_QUANTITY = re.compile(
+    r"\b(?:duas|dois|tres|quatro|cinco|seis|sete|oito|nove|dez|unidades)\b"
+)
+ONE_UNIT = re.compile(r"\bum(?:a)? unidade\b")
+NOT_A_CITY = {
+    "amanha", "hoje", "mim", "casa", "minha", "meu", "o", "a", "semana", "no", "na",
+    "em", "por", "favor", "pagando", "outras", "outra", "outro", "outros",
+}  # fmt: skip
+STATES = set(
+    "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split()
 )
 
 QUOTES = (PaymentOptions, ShippingQuote)
@@ -804,6 +827,9 @@ class Controller:
             return self._finish(message, MODEL_UNAVAILABLE)
         except (ProposalError, ProviderError) as error:
             LOGGER.warning("Extraction failed: %s", type(error).__name__)
+            if _over_installment_limit(message):
+                # The contract rejects a proposal above the limit the customer asked.
+                return self._finish(message, MAX_INSTALLMENTS_NOTE)
             if (
                 self.session.pending
                 or not POLICY_TOPIC.search(normalize(message))
@@ -1077,9 +1103,11 @@ class Controller:
             pending=tuple(pending),
         )
         results = self._contact_notice(results, intents)
-        if any(
-            int(count) > MAX_INSTALLMENTS
-            for count in INSTALLMENT_COUNT.findall(normalize(message))
+        if _over_installment_limit(message) and any(
+            isinstance(
+                r, (PaymentOptionsResult, ShippingQuoteResult, ProductSearchResult)
+            )
+            for r in results
         ):
             notes.append(MAX_INSTALLMENTS_NOTE)
         text = compose(results, displayed, pending, notes=tuple(dict.fromkeys(notes)))
@@ -1113,6 +1141,14 @@ class Controller:
             and ACCESSORY_REQUEST.search(text)
             and not POLICY_TOPIC.search(text)
             and "?" not in text
+            and "instrumento" not in text
+            and (
+                text[accessory.end() :].startswith((" para ", " pra "))
+                or (
+                    not _named_categories(self.snapshot, message)
+                    and self._typed_product_name(message) is None
+                )
+            )
         ):
             intent = OutOfScope(type="out_of_scope", topic=accessory.group(0))
         elif (
@@ -1126,31 +1162,50 @@ class Controller:
         return IntentTurn(intents=[intent]) if intent else None
 
     def _direct_freight(self, message):
-        """Freight naming one product and a city; missing facts are asked as usual."""
+        """Freight naming one product and a city; anything doubtful goes to the model."""
         destination = FREIGHT_DESTINATION.search(message)
         if not FREIGHT_REQUEST.search(message) or destination is None:
             return None
         before = message[: destination.start()]
-        quantity = FREIGHT_QUANTITY.search(before)
+        state = destination.group(2) or destination.group(3)
+        if (
+            set(_words(destination.group(1))) & NOT_A_CITY
+            or re.search(r"\b(?:para|pra)\b", before, re.IGNORECASE)
+            or (state and state.upper() not in STATES)
+        ):
+            return None
+        typed = FREIGHT_QUANTITY.search(before)
+        quantity = None
+        if typed:
+            if not re.fullmatch(r"[1-9][0-9]{0,2}", typed.group(1)):
+                return None
+            quantity = int(typed.group(1))
+        elif ONE_UNIT.search(normalize(before)):
+            quantity = 1
+        elif FREIGHT_UNCLEAR_QUANTITY.search(normalize(before)):
+            return None
         # The quantity is not a name word, although names such as "Kit 1" have digits.
         name = self._typed_product_name(
-            before[: quantity.start(1)] + before[quantity.end(1) :]
-            if quantity
-            else before
+            before[: typed.start(1)] + before[typed.end(1) :] if typed else before
         )
         if name is None:
             return None
+        if quantity is None and self._last_quote is None:
+            quantity = 1  # "frete do violão" means one unit; the response states it.
+        # "Bass 3X" in the name is not a request for credit.
+        name_words = set(_words(name))
+        payment_text = " ".join(
+            word for word in before.split() if not set(_words(word)) <= name_words
+        )
         methods = [
             m
             for m in ("pix", "debit", "credit", "boleto")
-            if payment_declared(m, message)
+            if payment_declared(m, payment_text)
         ]
-        state = destination.group(2) or destination.group(3)
         return ShippingQuote(
             type="shipping_quote",
             product_reference=QueryReference(kind="query", query=name),
-            # "frete do violão" asks about one unit; the response states the quantity.
-            quantity=int(quantity.group(1)) if quantity else 1,
+            quantity=quantity,
             payment_method=methods[0] if len(methods) == 1 else None,
             destination=Destination(
                 city=destination.group(1), state=state.upper() if state else None
@@ -1247,6 +1302,7 @@ class Controller:
         if (
             isinstance(intent, (ProductSearch, *QUOTES))
             and COMBINED_WORDING.search(normalize(self._message))
+            and not NEGATED_PAYMENT.search(normalize(self._message))
             and (supplied is None or "payment_method" in supplied)
         ):
             # "metade no pix, metade no cartão": no single method applies.

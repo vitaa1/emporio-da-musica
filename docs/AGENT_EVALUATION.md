@@ -3,7 +3,7 @@
 The latest recorded run, on 2026-11-04, passed **49/49 automated turn checks**
 across 19 scenarios. Manual reading of that run was limited to its promotion and
 warranty answers; the earlier run reviewed all marked turns against the source
-as described below. **725 deterministic tests**, Ruff lint,
+as described below. **761 deterministic tests**, Ruff lint,
 and Ruff formatting passed locally. This is a small development evaluation,
 not a claim of general model reliability or production readiness.
 
@@ -63,6 +63,7 @@ evaluator, cases, prompts, manual, and demo CSVs to identify the tested state.
 | [First run after corrections](../evals/results/2026-11-03-reviewed.json) | 28/29 automated passes. The three original failures no longer occurred. One GD20 extraction produced a sanitized `ProviderError`; no quote was invented. The underlying provider cause was not established. |
 | [Verification before manual-testing fixes](../evals/results/2026-11-03-verified.json) | 29/29 automated passes, exit code 0, including the GD20 scenario. All marked manual reviews passed. |
 | [Guided-flow verification](../evals/results/2026-11-03-guided.json) | 36/36 automated passes, exit code 0, with the guided responses and three added scenarios. All marked manual reviews passed. |
+| [Reviewed store policy verification](../evals/results/2026-11-04-policy-reviewed.json) | 49/49 automated passes after narrowing the direct routes following review. |
 | [Store policy verification](../evals/results/2026-11-04-policy.json) | 49/49 automated passes after aligning responses with the manual. One provider error was handled by the fallback route; its cause is unknown. |
 | [Requirement verification](../evals/results/2026-11-03-requirements.json) | 48/48 automated passes, exit code 0, with scenarios from the requirement probing and manual testing. All marked manual reviews passed. |
 

@@ -75,20 +75,13 @@ CAMPAIGN_NAMES = (
     r"black friday|aniversario da loja|volta as aulas|queima de estoque|"
     r"semana do musico|liquidacao de inverno|pascoa|oferta especial|desconto exclusivo"
 )
-CAMPAIGN_STATUS_CLAIM = re.compile(
-    rf"\b({CAMPAIGN_NAMES})\b.*\b(ativ[oa]s?|vigente|valendo|vale|em andamento|"
-    rf"disponive(l|is))\b|\b(ativ[oa]s?|vigente|valendo|em andamento)\b.*\b({CAMPAIGN_NAMES})\b"
-)
-# The manual's calendar (§6.1) gives each campaign's month and range; other percentages
-# next to a campaign name are status claims.
-CAMPAIGN_PERCENT = re.compile(rf"\b({CAMPAIGN_NAMES})\b.*[0-9]+ ?%")
-CAMPAIGN_MONTH = re.compile(r"\b(novembro|agosto|fevereiro)\b")
+CAMPAIGN_NAME = re.compile(rf"\b({CAMPAIGN_NAMES})\b")
 
 # Clear general questions answered from reviewed manual text, without the model.
 # Observed live: a small model sends these to product, order, or scope routes.
 _REVIEWED_QUESTIONS = (
     (
-        r"\baceita\w*\b.*\b(boleto|debito|pix|cartao|credito)\b",
+        r"\baceita\w* (?:\w+ )?(boleto|debito|pix|cartao|credito)\b",
         "Aceitamos PIX (5% de desconto sobre o preço de tabela, sem somar com "
         "promoção), cartão de débito, cartão de crédito em até 12x sem juros e boleto "
         "(compensação em até 3 dias úteis).",
@@ -104,7 +97,7 @@ _REVIEWED_QUESTIONS = (
         ("3.1",),
     ),
     (
-        r"\b(como|quando|prazo)\b.*\breembolso\b",
+        r"^(?!.*\bdefeito\b).*\b(como|quando|prazo)\b.*\breembolso\b",
         "No arrependimento de compra online, o reembolso é feito na mesma forma de "
         "pagamento original, em até 10 dias úteis.",
         ("4.1",),
@@ -116,7 +109,7 @@ _REVIEWED_QUESTIONS = (
         ("4.1",),
     ),
     (
-        r"\bboquilhas?\b",
+        r"\bboquilhas?\b.*\b(troc\w*|devol\w*)|\b(troc\w*|devol\w*)\b.*\bboquilhas?\b",
         "Boquilhas de instrumentos de sopro não são elegíveis para troca, por questões "
         "de higiene.",
         ("4.4",),
@@ -130,27 +123,29 @@ _REVIEWED_QUESTIONS = (
         ("5.1", "5.2"),
     ),
     (
-        r"\b(sedex|pac|jadlog)\b",
+        r"\b(prazo|demora\w*|quanto tempo|quantos dias)\b.*\b(sedex|pac|jadlog)\b"
+        r"|\b(sedex|pac|jadlog)\b.*\b(prazo|demora\w*|quanto tempo|quantos dias)\b",
         "Para fora da região metropolitana de Campo Grande, os prazos estimados são: "
         "PAC, 5 a 12 dias úteis; SEDEX, 2 a 5; Jadlog, 3 a 8. Todos têm rastreamento e "
         "seguro incluído. O valor depende do CEP, do peso e das dimensões do produto.",
         ("5.2",),
     ),
     (
-        r"\b(chegou|veio|recebi|entrega\w*)\b.*\b(avariad\w*|danificad\w*|amassad\w*)\b"
-        r"|\bavaria\b",
+        r"^(?!.*\b(troc\w*|devol\w*|reembolso|ontem|hoje)\b).*"
+        r"(\b(chegou|veio)\b.*\b(avariad\w*|danificad\w*|amassad\w*)\b|\bavaria\b)",
         "Em caso de avaria no transporte, recuse o recebimento e entre em contato "
         "imediatamente com a loja. Todos os envios têm seguro contra extravios e danos.",
         ("5.2",),
     ),
     (
-        r"\b(segur\w*|reserv\w*|mantem|manter|garant\w*)\b.*\bprecos?\b|\brain check\b",
+        r"\b(segura|seguram|segurar|reserva|reservam|reservar|mantem|manter) o preco\b"
+        r"|\brain check\b",
         "Não: promoções dependem do estoque, e produto esgotado durante a promoção não "
         "dá direito a reserva de preço.",
         ("6.2",),
     ),
     (
-        r"\bquando\b.*\b(black friday|aniversario da loja|volta as aulas"
+        r"\bquando (e|sera|acontece|vai ser|tem|comeca) (a |o )?(black friday|aniversario da loja|volta as aulas"
         r"|semana do musico)\b",
         "As campanhas costumam ser: Volta às Aulas em fevereiro, Aniversário da Loja "
         "em agosto, Black Friday em novembro e Semana do Músico na semana de 22 de "
@@ -223,8 +218,11 @@ def reviewed_question_answer(message: str) -> PolicyData | None:
     text = " ".join(folded.split()).strip(" ?!.")
     if "?" in text or re.search(r"[0-9]", text):
         return None  # Several questions, or a product, quantity, or order number.
+    if re.search(r"\bnao\b", text):
+        return None
+    personal = re.search(r"\b(meu|minha|meus|minhas)\b", text)  # An individual case.
     for pattern, answer in REVIEWED_QUESTIONS:
-        if pattern.search(text):
+        if pattern.search(text) and (not personal or "9" in answer.policy_references):
             return answer
     return None
 
@@ -291,10 +289,6 @@ def explain_policy(
         raise ContactConflict("Contact details require confirmation")
     if re.search(r"[0-9]{8,}", joined):
         raise ContactConflict("Contact details require confirmation")
-    if CAMPAIGN_STATUS_CLAIM.search(folded) or (
-        CAMPAIGN_PERCENT.search(folded) and not CAMPAIGN_MONTH.search(folded)
-    ):
-        raise PolicyAnswerError("Policy answer asserts a campaign status")
     if ACTION_CLAIMS.search(folded):
         raise PolicyAnswerError("Policy answer claims an executed action")
     manual = getattr(provider, "manual", None) or DEFAULT_MANUAL.read_text("utf-8")
@@ -303,4 +297,10 @@ def explain_policy(
         raise PolicyAnswerError("Policy answer contains unsupported numbers")
     if set(data.policy_references) <= WARRANTY_SECTIONS:
         return WARRANTY_ANSWER
-    return _reviewed_answer(question, data.policy_references) or data
+    reviewed = _reviewed_answer(question, data.policy_references)
+    if reviewed:
+        return reviewed
+    if CAMPAIGN_NAME.search(folded):
+        # Whether a campaign runs comes from promotion records, never model prose.
+        return reviewed_question_answer("quando e a black friday")
+    return data

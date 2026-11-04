@@ -138,9 +138,7 @@ SMALL_INSTALLMENTS_NOTE = (
     "Em 2 ou 3 vezes, parcelas abaixo de R$ 100,00 precisam de confirmação da loja."
 )
 
-MAX_INSTALLMENTS_NOTE = (
-    "Pelo manual, o parcelamento vai até 12x sem juros; acima disso não é possível."
-)
+MAX_INSTALLMENTS_NOTE = "Pelo manual, o parcelamento vai até 12x sem juros; acima disso não é possível. Me diga em quantas vezes quer, até 12x, que eu calculo."
 BUDGET_IGNORED = "O limite de preço não foi reconhecido nesta mensagem e não foi aplicado; informe o valor em números (por exemplo, até R$ 1000)."
 CARD_QUESTION = "Quantas unidades você quer e como prefere pagar?"
 CARD_PAYMENT_QUESTION = "Como prefere pagar?"

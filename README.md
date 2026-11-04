@@ -201,7 +201,7 @@ The manual is ambiguous or incomplete in several places. The prototype handles t
 .venv/bin/python -m ruff format --check .
 ```
 
-The 725 deterministic tests need no model or credentials. They run in CI on Linux, Windows, and macOS.
+The 761 deterministic tests need no model or credentials. They run in CI on Linux, Windows, and macOS.
 
 On 2026-11-03, a clean copy of this documentation's working tree was verified on WSL2 with Python 3.13 in a new virtual environment: installing the pins, the data validation, the offline commands, and the model example under Quick start all worked, as did the checks above. The Quick start's PowerShell commands were also run manually on Windows with a fresh clone. A single example run does not guarantee identical model output later.
 

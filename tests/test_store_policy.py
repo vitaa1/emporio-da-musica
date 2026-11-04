@@ -245,7 +245,7 @@ def test_model_may_explain_the_campaign_calendar(demo):
         }
     )
     text = turn(demo, POLICY, message="a black friday é em novembro?").text
-    assert "acontece em novembro" in text
+    assert "Black Friday em novembro" in text and "15%" not in text
 
 
 def test_two_inactive_campaigns_are_both_stated(demo):
@@ -338,7 +338,7 @@ def test_calendar_answer_with_month_before_percent_is_shown(demo):
         }
     )
     text = turn(demo, POLICY, message="a black friday é em novembro mesmo?").text
-    assert "acontece em novembro" in text
+    assert "Black Friday em novembro" in text and "15%" not in text
 
 
 def test_every_campaign_including_easter_is_reported(demo):
@@ -492,3 +492,130 @@ def test_freight_without_identified_product_uses_the_model(demo):
     )
     demo.handle("qual o frete para Dourados/MS?")
     assert demo.provider.requests
+
+
+# Review of the direct routes: doubtful messages go to the model.
+def reaches_model(demo, message):
+    demo.provider.responses.append(
+        {"intents": [{"type": "small_talk", "kind": "thanks"}]}
+    )
+    demo.provider.policy_responses.append({"covered": False})
+    demo.handle(message)
+    return bool(demo.provider.requests)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "frete de 0 Yamaha C40 para Campo Grande",
+        "frete de 1000 Yamaha C40 no pix para Campo Grande",
+        "frete de três Ohana SK-10 no pix para Campo Grande/MS",
+        "frete do Yamaha C40 para Campo Grande no pix",
+        "frete do Yamaha C40 no pix para minha casa",
+        "frete do Yamaha C40 no pix para amanhã",
+        "frete do Yamaha C40 no pix para Dourados e para Campo Grande",
+        "quero um violão com cordas de nylon",
+        "tem baixo de cinco cordas",
+        "quero guitarra sem amplificador",
+        "qual a garantia e o preço do violão Yamaha?",
+        "o seguro está incluído no preço?",
+        "recebi o violão amassado ontem, quero trocar",
+        "meu violão chegou amassado e quero devolver",
+        "vocês aceitam devolução se paguei no pix?",
+        "vende boquilha de sax",
+        "quando a loja abre na black friday?",
+        "meu sedex não chegou",
+        "quero o violão Yamaha por sedex",
+        "como faço para reembolso de defeito?",
+        "quando sai o reembolso do meu pedido",
+        "não quero excluir meus dados",
+    ],
+)
+def test_doubtful_messages_are_not_captured(demo, message):
+    assert reaches_model(demo, message)
+
+
+def test_lowercase_state_is_local_freight(demo):
+    text = demo.handle("frete do Yamaha C40 no pix para campo grande ms").text
+    assert "frete grátis" in text
+
+
+def test_name_digit_is_not_quantity_or_credit(demo):
+    text = demo.handle("frete do Yamaha Bass 3X para Campo Grande").text
+    assert "(crédito)" not in text
+
+
+def test_direct_freight_reuses_previous_quantity(demo):
+    turn(
+        demo,
+        quote("Ohana SK-10", payment_method="pix") | {"quantity": 3},
+        message="3 Ohana SK-10 no pix",
+    )
+    text = demo.handle("qual o frete do Ohana SK-10 para Campo Grande/MS?").text
+    assert "3 unidade(s)" in text and "frete grátis" in text
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "mostre guitarras pela metade do preço",
+        "1 Taylor 110e: pix mais barato que cartão?",
+    ],
+)
+def test_other_uses_of_split_words_are_not_combined(demo, message):
+    text = turn(demo, search("Taylor 110e"), message=message).text
+    assert "2.000,00" not in text
+
+
+def test_negated_split_keeps_declared_method(demo):
+    response = turn(
+        demo,
+        quote("Taylor 110e", payment_method="credit"),
+        message="1 Taylor 110e no crédito, não quero metade no pix",
+    )
+    assert "2.000,00" not in response.text
+
+
+def test_limit_note_when_model_proposes_invalid_count(demo):
+    bad = quote("Taylor 110e", payment_method="credit", installments=13)
+    demo.provider.responses.extend([{"intents": [bad]}, {"intents": [bad]}])
+    assert "vai até 12x" in demo.handle("1 Taylor 110e em 13x no crédito").text
+
+
+def test_limit_note_is_not_added_to_a_complaint(demo):
+    text = turn(
+        demo,
+        {"type": "complaint", "description": "atendimento"},
+        message="já liguei 20 vezes e ninguém atende",
+    ).text
+    assert "12x" not in text
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "A Black Friday\nesta ativa agora",
+        "10% de desconto na Black Friday",
+        "Hoje temos Black Friday",
+    ],
+)
+def test_model_prose_about_a_campaign_is_replaced(demo, answer):
+    demo.provider.policy_responses.append(
+        {"covered": True, "answer": answer, "policy_references": ["6"]}
+    )
+    text = turn(demo, POLICY, message="como funciona a black friday?").text
+    assert answer not in text and "não indica promoção ativa" in text
+
+
+@pytest.mark.parametrize(
+    "message", ["quero um violão com cordas de nylon", "quero violão de seis cordas"]
+)
+def test_strings_describing_an_instrument_are_not_an_accessory(demo, message):
+    response = turn(
+        demo, {"type": "product_search", "category": "Violões"}, message=message
+    )
+    assert "exclusivamente" not in response.text
+
+
+def test_strings_alone_are_still_an_accessory(demo):
+    assert "exclusivamente" in demo.handle("quero cordas").text
