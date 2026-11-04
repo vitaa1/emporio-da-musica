@@ -64,7 +64,7 @@ Yamaha
 Quero o segundo
 2 unidades no pix
 E em 10 vezes no crédito?
-Qual o horário de sábado?
+Qual o horário de funcionamento no sábado?
 ```
 
 A broad request gets a question about brand or budget. A list shows names and prices, and a chosen model shows its stock, unit price, and every payment option.
@@ -96,14 +96,14 @@ Other commands are listed when the session starts.
 
 ## Configuration
 
-| Setting | Flag | Environment variable | Default |
-| --- | --- | --- | --- |
-| Ollama address | `--ollama-url` | `OLLAMA_BASE_URL` | `http://localhost:11434` |
-| Model | `--model` | `OLLAMA_MODEL` | `qwen2.5:3b` |
-| Socket timeout (seconds, maximum 600) | `--timeout` | | `120` |
-| Simulated customer for order lookup | `--customer-id` | | none |
-| Alternative CSV directory | `--data-dir` | | `data/demo/` |
-| Alternative manual (reviewed UTF-8 text) | `--manual` | | bundled manual |
+| Setting                                  | Flag            | Environment variable | Default                  |
+| ---------------------------------------- | --------------- | -------------------- | ------------------------ |
+| Ollama address                           | `--ollama-url`  | `OLLAMA_BASE_URL`    | `http://localhost:11434` |
+| Model                                    | `--model`       | `OLLAMA_MODEL`       | `qwen2.5:3b`             |
+| Socket timeout (seconds, maximum 600)    | `--timeout`     |                      | `120`                    |
+| Simulated customer for order lookup      | `--customer-id` |                      | none                     |
+| Alternative CSV directory                | `--data-dir`    |                      | `data/demo/`             |
+| Alternative manual (reviewed UTF-8 text) | `--manual`      |                      | bundled manual           |
 
 Flags override environment variables. `.env` files are not loaded automatically; `.env.example` lists the variables to export.
 
@@ -142,31 +142,31 @@ Python composer ── writes prices, stock, orders, errors, and clarifications
 
 General policy questions take a separate route: a second model call receives the manual and only the customer's current question. Its answer is validated before display and is shown with its manual sections.
 
-| What | Where |
-| --- | --- |
-| Intents and results | `emporio_da_musica/contracts/` |
-| CSV loading and validation | `emporio_da_musica/data/` |
-| Model adapters, prompts, and policy validation | `emporio_da_musica/providers/` |
-| Orchestration | `emporio_da_musica/controller.py` |
-| Catalog and payment rules | `emporio_da_musica/catalog.py` |
-| Return assessments | `emporio_da_musica/returns.py` |
-| Response templates | `emporio_da_musica/composer.py` |
-| Terminal interface | `emporio_da_musica/cli.py` |
+| What                                           | Where                             |
+| ---------------------------------------------- | --------------------------------- |
+| Intents and results                            | `emporio_da_musica/contracts/`    |
+| CSV loading and validation                     | `emporio_da_musica/data/`         |
+| Model adapters, prompts, and policy validation | `emporio_da_musica/providers/`    |
+| Orchestration                                  | `emporio_da_musica/controller.py` |
+| Catalog and payment rules                      | `emporio_da_musica/catalog.py`    |
+| Return assessments                             | `emporio_da_musica/returns.py`    |
+| Response templates                             | `emporio_da_musica/composer.py`   |
+| Terminal interface                             | `emporio_da_musica/cli.py`        |
 
 ## Technical decisions
 
-| Decision | Why | Trade-off |
-| --- | --- | --- |
-| Python owns prices, rules, and authorization | A wrong price or a leaked order is the costliest failure, and live testing showed the 3B model producing valid JSON with wrong meaning | Responses are less natural, and every new rule needs code |
-| Model output is intents, not free text, for operational answers | Critical facts cannot be rewritten or invented by the model | Requires a schema and a controller for each operation |
-| Local Ollama with `qwen2.5:3b` | No cost or credentials, and customer messages stay local. It passed the same-prompt smoke test where Gemma failed on one step | A small sample, not proof of general superiority; a small model needs more guards |
-| No agent framework | One agent with sequential operations is simple enough for a direct controller | Retries and tool loops would have to be written if the scope grew |
-| CSVs in memory, no database or vector store | The data is small and read-only; the full manual fits in the model context | Does not scale to a large catalog or manual, and has no live stock |
-| Session-only history | The challenge does not require persistence | Conversations are lost when the CLI closes |
-| `--customer-id` set outside the model | The model and the message text cannot change whose orders are visible | Demonstrates authorization, not real authentication |
-| `Decimal` for all money | Avoids floating-point errors at policy thresholds | None significant |
-| Guided purchase questions and payment options composed in Python | Customers get a conversation without letting the model state prices; the small model is not trusted for this text | Questions are templates, so the tone varies little |
-| Ask for confirmation when the manual is ambiguous | The challenge allows documented assumptions, and an invented commitment is worse than a clarification | Some answers defer to the store |
+| Decision                                                         | Why                                                                                                                                    | Trade-off                                                                         |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Python owns prices, rules, and authorization                     | A wrong price or a leaked order is the costliest failure, and live testing showed the 3B model producing valid JSON with wrong meaning | Responses are less natural, and every new rule needs code                         |
+| Model output is intents, not free text, for operational answers  | Critical facts cannot be rewritten or invented by the model                                                                            | Requires a schema and a controller for each operation                             |
+| Local Ollama with `qwen2.5:3b`                                   | No cost or credentials, and customer messages stay local. It passed the same-prompt smoke test where Gemma failed on one step          | A small sample, not proof of general superiority; a small model needs more guards |
+| No agent framework                                               | One agent with sequential operations is simple enough for a direct controller                                                          | Retries and tool loops would have to be written if the scope grew                 |
+| CSVs in memory, no database or vector store                      | The data is small and read-only; the full manual fits in the model context                                                             | Does not scale to a large catalog or manual, and has no live stock                |
+| Session-only history                                             | The challenge does not require persistence                                                                                             | Conversations are lost when the CLI closes                                        |
+| `--customer-id` set outside the model                            | The model and the message text cannot change whose orders are visible                                                                  | Demonstrates authorization, not real authentication                               |
+| `Decimal` for all money                                          | Avoids floating-point errors at policy thresholds                                                                                      | None significant                                                                  |
+| Guided purchase questions and payment options composed in Python | Customers get a conversation without letting the model state prices; the small model is not trusted for this text                      | Questions are templates, so the tone varies little                                |
+| Ask for confirmation when the manual is ambiguous                | The challenge allows documented assumptions, and an invented commitment is worse than a clarification                                  | Some answers defer to the store                                                   |
 
 ### Prompt and retrieval strategy
 
