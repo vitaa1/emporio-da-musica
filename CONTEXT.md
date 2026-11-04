@@ -30,6 +30,7 @@ Windows-hosted Ollama is reachable from WSL at the Windows host address (`ip rou
 
 ## Current project status
 
+- `fix/agent-requirement-gaps` corrects gaps from requirement probing and reviews: 647 tests, 48/48 turns in `evals/results/2026-11-03-requirements.json`.
 - PR #37 (final README, split guides) is merged. `fix/catalog-search-terms` adds search-term checks, a startup server check, and the guided purchase flow: 535 tests, 36/36 evaluation turns in `evals/results/2026-11-03-guided.json`.
 - P13 (#21) merged through PR #36 at `b1bcde7`; CI passed on all three platforms. P14 (#22) is in progress on `docs/final-readme-submission`. P13 delivered a versioned 12-scenario evaluator, preserved before/after runs, five real conversations, and a review report. See `docs/AGENT_EVALUATION.md`. All 489 offline tests and Ruff checks pass.
 - Review corrected quantity loss on recognized payment-only follow-ups, non-PIX methods copied without current-message evidence, warranty-only policy prose (now a fixed manual summary), and order-dependent evaluation matching. The final live run passed 29/29 automated checks and all seven marked manual reviews. A preceding run had one sanitized provider error whose underlying cause remains unverified; both runs are preserved. No prompts or dependencies changed.

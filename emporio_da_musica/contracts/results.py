@@ -99,7 +99,7 @@ class OutOfScopeData(Contract):
 
 
 class SmallTalkData(Contract):
-    template: Literal["greeting", "thanks", "goodbye"]
+    template: Literal["greeting", "thanks", "goodbye", "identity"]
 
 
 Status = Literal[

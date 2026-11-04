@@ -5,7 +5,7 @@ import json
 import math
 from http.client import HTTPException
 from pathlib import Path
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
@@ -136,6 +136,8 @@ class OllamaProvider:
             ) as response:
                 models = json.loads(response.read(256001))["models"]
             names = {model["name"] for model in models}
+        except HTTPError:
+            return None  # The server answered; the first message reports problems.
         except OSError:
             return "unreachable"
         except (HTTPException, ValueError, KeyError, TypeError, RecursionError):
@@ -175,6 +177,11 @@ class OllamaProvider:
             ):
                 raise ValueError
             return content
+        except HTTPError as error:
+            # 404 means the model is missing; others are model failures on an
+            # answering server, such as the repeat limit.
+            kind = ProviderConnectionError if error.code == 404 else ProviderError
+            raise kind("Ollama request failed") from None
         except (OSError, URLError):
             raise ProviderConnectionError("Ollama request failed") from None
         except (

@@ -48,6 +48,7 @@ OPERATIONS = {
 }
 TEMPLATES = {
     "greeting": "Olá! Que bom ter você por aqui no Empório da Música. Posso ajudar com instrumentos, preços, pedidos e políticas da loja.",
+    "identity": "Sou o assistente virtual do Empório da Música, a loja de instrumentos musicais de Campo Grande/MS. Posso ajudar você a escolher um instrumento e tirar dúvidas sobre preços, pedidos, pagamento, frete, trocas e horários.",
     "thanks": "Imagina, foi um prazer ajudar! Se precisar de mais alguma coisa, é só chamar.",
     "goodbye": "Até mais! Boa música e conte com a gente quando precisar.",
     "accessory_redirect": "Esse item a gente não tem: o Empório da Música trabalha exclusivamente com instrumentos musicais e não vende acessórios como cordas, cabos, palhetas, pedais, amplificadores ou cases. Também não indico outras lojas. Posso ajudar você a encontrar um instrumento?",
@@ -63,6 +64,8 @@ ORDER_STATUS = {
     "cancelled": "cancelado",
 }
 REASONS = {
+    "PRODUCT_NOT_FOR_SALE": "Esse produto não está disponível para venda agora, então não calculei valores.",
+    "NO_ACTIVE_PROMOTION": "Não encontrei promoção ativa para esse pedido no catálogo.",
     "NO_CATALOG_MATCH": "Não encontrei produtos com esses critérios.",
     "COMBINED_PAYMENT_REQUIRES_CONFIRMATION": "Pagamento combinado precisa de confirmação da loja. Não solicitei essa confirmação.",
     "AMBIGUOUS_INSTALLMENT_BAND": "A regra para 2–3 parcelas precisa de confirmação da loja. Não solicitei essa confirmação.",
@@ -125,6 +128,8 @@ SMALL_INSTALLMENTS_NOTE = "Parcelar em 2 ou 3 vezes precisa de confirmação da 
 
 BUDGET_IGNORED = "O limite de preço não foi reconhecido nesta mensagem e não foi aplicado; informe o valor em números (por exemplo, até R$ 1000)."
 CARD_QUESTION = "Quantas unidades você quer e como prefere pagar?"
+CARD_PAYMENT_QUESTION = "Como prefere pagar?"
+SEARCH_FILTER_DROPPED = "Não encontrei esse nome; mostrei as opções da categoria."
 LIST_QUESTION = "Qual modelo te interessa?"
 CATALOG_FOOTER = "Nada foi comprado ou reservado; valores do catálogo da loja."
 ORDER_FOOTER = "Dados do registro histórico do pedido, sem consulta em tempo real à transportadora; nenhuma alteração foi feita."
@@ -166,11 +171,21 @@ def render_summary(quote: ProductQuote) -> str:
         return f"{safe_text(quote.name)} — {AVAILABILITY[quote.availability]}"
     if quote.stock_quantity == 0:
         return f"{safe_text(quote.name)} — sem estoque"
+    if quote.availability == "insufficient_stock":
+        return f"{safe_text(quote.name)} — estoque insuficiente"
     price = money(quote.final_total_brl / quote.quantity)
     if quote.promotion_percent is not None:
         percent = format(quote.promotion_percent, "f").replace(".", ",")
         price += f" (promoção de {percent}%)"
     return f"{safe_text(quote.name)} — {price}"
+
+
+def render_alternatives(quotes) -> str:
+    """Manual §7.3: offer available options when a product is unavailable."""
+    options = "; ".join(
+        f"{safe_text(q.name)} ({money(q.final_total_brl)})" for q in quotes
+    )
+    return f"Opções disponíveis parecidas: {options}."
 
 
 def render_card(quote: ProductQuote) -> str:
@@ -334,7 +349,12 @@ def compose(results, displayed_ids: tuple[int, ...], pending, notes=()) -> str:
                     )
                     lines = [number + render_card(products[0])]
                     if not pending and products[0].availability == "available":
-                        lines.append(CARD_QUESTION)
+                        lines.append(
+                            CARD_QUESTION
+                            if "Unit-price inquiry: quantity 1."
+                            in products[0].assumptions
+                            else CARD_PAYMENT_QUESTION
+                        )
                 elif exploring:
                     lines = [
                         f"{displayed_ids.index(q.product_id) + 1}. {render_summary(q)}"

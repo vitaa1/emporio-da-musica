@@ -1,7 +1,7 @@
 # Recorded example conversations
 
 Recorded on 2026-11-03 with local `qwen2.5:3b` and bundled synthetic demo data.
-These are five complete scenarios from the [latest verification](../evals/results/2026-11-03-guided.json),
+These are five complete scenarios from the [latest verification](../evals/results/2026-11-03-requirements.json),
 captured through `Controller.handle`, the same application boundary used by the CLI.
 Messages and responses below are verbatim, not illustrative rewrites. Each scenario starts a fresh session.
 See the [evaluation report](AGENT_EVALUATION.md) for earlier failures, corrections, and remaining limitations.
@@ -249,7 +249,7 @@ Em quais horários vocês atendem aos sábados?
 Assistant:
 
 ```text
-Nós atendemos aos sábados das 9h às 13h. (Manual da loja, seção 2.)
+A loja funciona de segunda a sexta, das 9h às 18h, e aos sábados, das 9h às 13h. Domingos e feriados a loja fica fechada. Em datas especiais, o horário pode ser estendido. (Manual da loja, seção 2.)
 
 Explicação geral com base no manual da loja; casos específicos dependem dos dados do pedido e não foram aprovados aqui.
 ```
