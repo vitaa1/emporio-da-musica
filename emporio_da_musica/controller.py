@@ -8,13 +8,15 @@ from decimal import Decimal
 
 from pydantic import ValidationError
 
-from .catalog import normalize, quote_product, search_catalog
+from .catalog import MAX_CATALOG_RESULTS, normalize, quote_product, search_catalog
 from .composer import (
     BUDGET_IGNORED,
     CITY_ASSUMED,
+    MAX_INSTALLMENTS_NOTE,
     QUOTE_FACTS_REUSED,
     SEARCH_FILTER_DROPPED,
     compose,
+    promotion_notice,
     render_alternatives,
 )
 from .contracts.common import MAX_MESSAGE_LENGTH
@@ -22,6 +24,7 @@ from .contracts.dates import Clock, store_today
 from .contracts.intents import (
     ClarificationUpdate,
     Complaint,
+    Destination,
     IntentTurn,
     OrderStatus,
     OrdinalReference,
@@ -79,6 +82,7 @@ from .providers.policy import (
     NotCovered,
     PolicyAnswerError,
     explain_policy,
+    reviewed_question_answer,
 )
 from .returns import REFERENCES, assess_return, required_fields
 
@@ -132,7 +136,29 @@ OUTSIDE_CATALOG = re.compile(
     r"|trombones|tuba|tubas|trompa|trompas|harpa|harpas)\b"
 )
 SELL_QUESTION = re.compile(r"\b(vende|vendem|vendas?|tem|tens|trabalh\w+|possuem)\b")
-PROMOTION_WORDS = re.compile(r"\b(promocao|promocoes|oferta|ofertas)\b")
+# Normalized campaign words (§6.1 and promotion records) and their display names.
+CAMPAIGNS = {
+    "black friday": "Black Friday",
+    "aniversario da loja": "Aniversário da Loja",
+    "volta as aulas": "Volta às Aulas",
+    "queima de estoque": "Queima de Estoque",
+    "semana do musico": "Semana do Músico",
+    "liquidacao de inverno": "Liquidação de Inverno",
+    "pascoa": "de Páscoa",
+    "oferta especial": "Oferta Especial",
+    "desconto exclusivo": "Desconto Exclusivo",
+}
+PROMOTION_WORDS = re.compile(
+    r"\b(promocao|promocoes|oferta|ofertas|liquidacao|liquidacoes)\b"
+)
+CAMPAIGN_QUESTION = re.compile(
+    r"\b(ativa|ativo|valendo|vale|vigente|tem|teve|rolando|desconto|descontos|preco"
+    r"|esta|estao|entra|entram|participa|participam)\b"
+)
+# "a loja abre na black friday?" is about store hours, not the discount.
+CAMPAIGN_OTHER_TOPIC = re.compile(
+    r"\b(horario|horarios|abre|abrem|aberta|aberto|fecha|fecham|atendem|funcionam)\b"
+)
 PROMOTION_RULE = re.compile(
     r"\b(acumula|acumular|acumulam|cumulativ[oa]|pix|regra|regras|politica|como funcion\w+)\b"
 )
@@ -188,6 +214,8 @@ def _is_broad_request(intent, message):
 
 def _rerouted_search(snapshot, intent, message, guided_category, intent_count):
     """Route two observed model mistakes back to the catalog search."""
+    if isinstance(intent, PolicyQuestion) and reviewed_question_answer(message):
+        return intent
     text = normalize(message)
     if (
         intent_count == 1
@@ -213,7 +241,7 @@ def _rerouted_search(snapshot, intent, message, guided_category, intent_count):
         ):
             # The manual's general text must not imply these are for sale.
             return ProductSearch(type="product_search", query=outside.group(0))
-        if (
+        if _asks_about_campaign(message) or (
             PROMOTION_WORDS.search(text)
             and not PROMOTION_RULE.search(text)
             and not POLICY_TOPIC.search(text)
@@ -272,8 +300,31 @@ def _rerouted_search(snapshot, intent, message, guided_category, intent_count):
     return intent
 
 
-def _active_promotions(snapshot, intent, message):
-    """Real active promotions matching the instruments and every name typed."""
+def _over_installment_limit(message):
+    return any(
+        int(count) > MAX_INSTALLMENTS
+        for count in INSTALLMENT_COUNT.findall(normalize(message))
+    )
+
+
+def _named_campaigns(message):
+    """Campaigns named in the message, as normalized keys."""
+    text = normalize(message)
+    return [key for key in CAMPAIGNS if re.search(rf"\b{key}\b", text)]
+
+
+def _asks_about_campaign(message):
+    """A named campaign with a question about its validity, never store hours."""
+    text = normalize(message)
+    return bool(
+        _named_campaigns(message)
+        and CAMPAIGN_QUESTION.search(text)
+        and not CAMPAIGN_OTHER_TOPIC.search(text)
+    )
+
+
+def _promotion_candidates(snapshot, intent, message, campaigns):
+    """Products in the instruments and names typed, with whether a name was typed."""
     named = _named_categories(snapshot, message)
     if intent.category:
         named = {intent.category}
@@ -292,22 +343,37 @@ def _active_promotions(snapshot, intent, message):
     typed = (set(_words(message)) & vocabulary) - set(INSTRUMENT_CATEGORIES)
     typed -= {w for w in typed if w.isdigit()}
     written = _words(message)
+    # "em 3x" is an installment count; "Bass 3X" is part of a product name.
+    typed -= {
+        w
+        for previous, w in zip(["", *written], written)
+        if re.fullmatch(r"[0-9]+x", w) and previous not in vocabulary
+    }
+    campaign_words = {w for key in campaigns for w in _words(key)}
+    typed -= campaign_words  # "Black" in a name is not "Black Friday".
+    all_name_words = {w for p in snapshot.products.values() for w in _words(p.name)}
     brands = set(_brand_names(snapshot))
     for word, following in zip(written, written[1:]):
         if (
             word in brands
-            and following not in vocabulary
+            and following not in all_name_words
             and following not in AFTER_NAME_WORDS
+            and following not in campaign_words
         ):
-            return []
-    ids = []
-    for product in sorted(products, key=lambda p: p.product_id):
-        promotions = snapshot.promotions_by_product[product.product_id]
-        if not any(p.is_active for p in promotions):
-            continue
-        if typed <= set(_words(product.name)):
-            ids.append(product.product_id)
-    return ids
+            return [], False
+    matching = [
+        product.product_id
+        for product in sorted(products, key=lambda p: p.product_id)
+        if typed <= set(_words(product.name))
+    ]
+    return matching, bool(typed)
+
+
+def _has_active_promotion(snapshot, product_id, campaign=None):
+    return any(
+        p.is_active and (campaign is None or campaign in normalize(p.description))
+        for p in snapshot.promotions_by_product[product_id]
+    )
 
 
 def _brand_names(snapshot):
@@ -492,10 +558,48 @@ STORE_ADDRESS = (
 ACCESSORY_WORDS = re.compile(
     r"\bacessorios?\b|\bencordoamentos?\b|\bpalhetas?\b|\bpedaleiras?\b"
     r"|\bamplificador(?:es)?\b|\bpedais\b(?! de bateria)"
-    r"|\bpedal (?:de efeito|para guitarra|pra guitarra)\b"
-    r"|(?<![0-9] )\bcordas?\b(?! orquestra)"
+    r"|\bpedal (?:de (?!bateria\b)\w+|para guitarra|pra guitarra)\b"
+    # "com cordas de nylon" and "seis cordas" describe an instrument.
+    r"|(?<![0-9] )(?<!com )(?<!cinco )(?<!seis )(?<!sete )\bcordas?\b(?! orquestra)"
     r"|\b(?:cabos|capas|cases)\b(?! d[oa]s? )"
     r"|\b(?:cabo|capa|case) (?:de|para|pra|p10|p2)\b"
+)
+
+ACCESSORY_REQUEST = re.compile(
+    r"\b(tem|tens|vende|vendem|quero|queria|preciso|procuro|comprar)\b"
+)
+BARE_INSTRUMENT_QUESTION = re.compile(
+    r"(?:voces )?(?:tem|vende|vendem) (?:uma? |algum |alguma )?(\w+)"
+)
+COMBINED_WORDING = re.compile(
+    r"\b(?:(?:metade|parte) (?:no|na|em) (?:pix|cartao|credito|debito|boleto)"
+    r"|pix (?:\+|mais) (?:no |o )?cartao|cartao (?:\+|mais) (?:no |o )?pix"
+    r"|dois cartoes)\b"
+)
+INSTALLMENT_COUNT = re.compile(r"\b([0-9]+) ?(?:x|vezes|parcelas)\b")
+MAX_INSTALLMENTS = 12
+FREIGHT_REQUEST = re.compile(r"\bfrete\b", re.IGNORECASE)
+# The destination closes the message: "... para Campo Grande/MS?".
+FREIGHT_DESTINATION = re.compile(
+    r"\s(?:para|pra)\s+([^\W\d_]+(?:\s[^\W\d_]+){0,3}?)"
+    r"(?:\s*[/-]\s*([A-Za-z]{2})|\s+([A-Za-z]{2}))?\s*[?.!]*$"
+)
+# Not "em 3x", "D-8", or the "7 Cordas" of a product name.
+FREIGHT_QUANTITY = re.compile(
+    r"\b(?:de|do|da|dos|das|frete|quero)\s+([0-9][0-9.,]*)\b(?!\s*x|-|\s*cordas)",
+    re.IGNORECASE,
+)
+# Anything else about quantity is left to the model instead of assuming one unit.
+FREIGHT_UNCLEAR_QUANTITY = re.compile(
+    r"\b(?:duas|dois|tres|quatro|cinco|seis|sete|oito|nove|dez|unidades)\b"
+)
+ONE_UNIT = re.compile(r"\bum(?:a)? unidade\b")
+NOT_A_CITY = {
+    "amanha", "hoje", "mim", "casa", "minha", "meu", "o", "a", "semana", "no", "na",
+    "em", "por", "favor", "pagando", "outras", "outra", "outro", "outros",
+}  # fmt: skip
+STATES = set(
+    "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split()
 )
 
 QUOTES = (PaymentOptions, ShippingQuote)
@@ -524,7 +628,9 @@ PAYMENT_EVIDENCE = {
     "credit": re.compile(r"\b(?:credito|credit|cartao|parcel\w*|vezes|[0-9]+ ?x)\b"),
     "debit": re.compile(r"\b(?:debito|debit|cartao)\b"),
     "boleto": re.compile(r"\bboleto\b"),
-    "combined": re.compile(r"\b(?:combin\w*|meio a meio|dividi\w*)\b"),
+    "combined": re.compile(
+        r"\b(?:combin\w*|meio a meio|dividi\w*)\b|" + COMBINED_WORDING.pattern
+    ),
 }
 NEGATED_PAYMENT = re.compile(r"\b(?:nao|nem|vez de|sem(?!\s+juros\b))\b")
 
@@ -709,8 +815,10 @@ class Controller:
             ),
         )
         try:
-            proposal = self._direct_choice(message) or extract_proposal(
-                self.provider, request, clock=self.clock
+            proposal = (
+                self._direct_choice(message)
+                or self._direct_route(message)
+                or extract_proposal(self.provider, request, clock=self.clock)
             )
         except RequestTooBroadError:
             return self._finish(message, "Faça até cinco pedidos por mensagem.")
@@ -719,6 +827,9 @@ class Controller:
             return self._finish(message, MODEL_UNAVAILABLE)
         except (ProposalError, ProviderError) as error:
             LOGGER.warning("Extraction failed: %s", type(error).__name__)
+            if _over_installment_limit(message):
+                # The contract rejects a proposal above the limit the customer asked.
+                return self._finish(message, MAX_INSTALLMENTS_NOTE)
             if (
                 self.session.pending
                 or not POLICY_TOPIC.search(normalize(message))
@@ -992,6 +1103,13 @@ class Controller:
             pending=tuple(pending),
         )
         results = self._contact_notice(results, intents)
+        if _over_installment_limit(message) and any(
+            isinstance(
+                r, (PaymentOptionsResult, ShippingQuoteResult, ProductSearchResult)
+            )
+            for r in results
+        ):
+            notes.append(MAX_INSTALLMENTS_NOTE)
         text = compose(results, displayed, pending, notes=tuple(dict.fromkeys(notes)))
         return self._finish(message, text, tuple(results))
 
@@ -1010,6 +1128,90 @@ class Controller:
         )
         return TurnResponse(text, results)
 
+    def _direct_route(self, message):
+        """Unambiguous requests that do not depend on model interpretation."""
+        if self.session.pending:
+            return None
+        text = normalize(message).strip(" ?!.")
+        intent = None
+        if reviewed_question_answer(message):
+            intent = PolicyQuestion(type="policy_question")
+        elif (
+            (accessory := ACCESSORY_WORDS.search(text))
+            and ACCESSORY_REQUEST.search(text)
+            and not POLICY_TOPIC.search(text)
+            and "?" not in text
+            and "instrumento" not in text
+            and (
+                text[accessory.end() :].startswith((" para ", " pra "))
+                or (
+                    not _named_categories(self.snapshot, message)
+                    and self._typed_product_name(message) is None
+                )
+            )
+        ):
+            intent = OutOfScope(type="out_of_scope", topic=accessory.group(0))
+        elif (
+            (instrument := BARE_INSTRUMENT_QUESTION.fullmatch(text))
+            and (category := INSTRUMENT_CATEGORIES.get(instrument.group(1)))
+            and _category_products(self.snapshot, category)
+        ):
+            intent = ProductSearch(type="product_search", category=category)
+        else:
+            intent = self._direct_freight(message)
+        return IntentTurn(intents=[intent]) if intent else None
+
+    def _direct_freight(self, message):
+        """Freight naming one product and a city; anything doubtful goes to the model."""
+        destination = FREIGHT_DESTINATION.search(message)
+        if not FREIGHT_REQUEST.search(message) or destination is None:
+            return None
+        before = message[: destination.start()]
+        state = destination.group(2) or destination.group(3)
+        if (
+            set(_words(destination.group(1))) & NOT_A_CITY
+            or re.search(r"\b(?:para|pra)\b", before, re.IGNORECASE)
+            or (state and state.upper() not in STATES)
+        ):
+            return None
+        typed = FREIGHT_QUANTITY.search(before)
+        quantity = None
+        if typed:
+            if not re.fullmatch(r"[1-9][0-9]{0,2}", typed.group(1)):
+                return None
+            quantity = int(typed.group(1))
+        elif ONE_UNIT.search(normalize(before)):
+            quantity = 1
+        elif FREIGHT_UNCLEAR_QUANTITY.search(normalize(before)):
+            return None
+        # The quantity is not a name word, although names such as "Kit 1" have digits.
+        name = self._typed_product_name(
+            before[: typed.start(1)] + before[typed.end(1) :] if typed else before
+        )
+        if name is None:
+            return None
+        if quantity is None and self._last_quote is None:
+            quantity = 1  # "frete do violão" means one unit; the response states it.
+        # "Bass 3X" in the name is not a request for credit.
+        name_words = set(_words(name))
+        payment_text = " ".join(
+            word for word in before.split() if not set(_words(word)) <= name_words
+        )
+        methods = [
+            m
+            for m in ("pix", "debit", "credit", "boleto")
+            if payment_declared(m, payment_text)
+        ]
+        return ShippingQuote(
+            type="shipping_quote",
+            product_reference=QueryReference(kind="query", query=name),
+            quantity=quantity,
+            payment_method=methods[0] if len(methods) == 1 else None,
+            destination=Destination(
+                city=destination.group(1), state=state.upper() if state else None
+            ),
+        )
+
     def _execute(self, intent, selected, original_display, pinned):
         if (
             self._intent_count == 1
@@ -1021,7 +1223,14 @@ class Controller:
         if (
             self._intent_count == 1
             and isinstance(intent, ProductSearch)
-            and PROMOTION_WORDS.search(normalize(self._message))
+            and (
+                PROMOTION_WORDS.search(normalize(self._message))
+                or _asks_about_campaign(self._message)
+                or (
+                    _named_campaigns(self._message)
+                    and not (intent.query or intent.category)
+                )
+            )
         ):
             result = self._promotions(intent)
             return result, result if result.status == "success" else None, None
@@ -1090,6 +1299,16 @@ class Controller:
 
     def _typed_payment(self, intent, supplied):
         """Drop payment methods not supported by this message, without inferring one."""
+        if (
+            isinstance(intent, (ProductSearch, *QUOTES))
+            and COMBINED_WORDING.search(normalize(self._message))
+            and not NEGATED_PAYMENT.search(normalize(self._message))
+            and (supplied is None or "payment_method" in supplied)
+        ):
+            # "metade no pix, metade no cartão": no single method applies.
+            return intent.model_copy(
+                update={"payment_method": "combined", "installments": None}
+            )
         if (
             not isinstance(intent, (ProductSearch, *QUOTES))
             or intent.payment_method is None
@@ -1331,13 +1550,40 @@ class Controller:
         return quotes
 
     def _promotions(self, intent):
-        ids = _active_promotions(self.snapshot, intent, self._message)
-        if not ids:
+        outside = OUTSIDE_CATALOG.search(normalize(self._message))
+        if outside and not any(
+            outside.group(0) in normalize(p.name)
+            for p in self.snapshot.products.values()
+        ):
+            # An instrument the catalog lacks must not be answered with other products.
             return ProductSearchResult(
                 status="not_found",
                 reason_code="NO_ACTIVE_PROMOTION",
                 policy_references=("6",),
             )
+        campaigns = _named_campaigns(self._message)
+        candidates, named = _promotion_candidates(
+            self.snapshot, intent, self._message, campaigns
+        )
+        active = [i for i in candidates if _has_active_promotion(self.snapshot, i)]
+        ids = (
+            [
+                i
+                for i in candidates
+                if any(_has_active_promotion(self.snapshot, i, c) for c in campaigns)
+            ]
+            if campaigns
+            else active
+        )
+        # Manual §7.3: say what is not active and show the current price.
+        unmatched = [
+            c
+            for c in campaigns
+            if not any(_has_active_promotion(self.snapshot, i, c) for i in candidates)
+        ]
+        fallback = not ids
+        if fallback:
+            ids = candidates if named else active if campaigns else []
         quotes = []
         for product_id in ids:
             found = quote_product(
@@ -1362,13 +1608,39 @@ class Controller:
                 reason_code="NO_ACTIVE_PROMOTION",
                 policy_references=("6",),
             )
+        notice = promotion_notice(
+            [
+                (
+                    CAMPAIGNS[c],
+                    any(
+                        _has_active_promotion(self.snapshot, i, c)
+                        for i in self.snapshot.products
+                    ),
+                )
+                for c in unmatched
+            ],
+            current_prices=fallback and named,
+            count=len(quotes),
+            priced=any(q.availability == "available" for q in quotes),
+        )
         return ProductSearchResult(
             status="success",
-            data=CatalogData(products=tuple(quotes), total_matches=len(quotes)),
-            policy_references=("6",),
+            data=CatalogData(
+                products=tuple(quotes[:MAX_CATALOG_RESULTS]),
+                total_matches=len(quotes),
+                notice=notice,
+            ),
+            policy_references=("6", "7.3") if notice else ("6",),
         )
 
     def _policy(self, intent):
+        reviewed = reviewed_question_answer(self._message)
+        if reviewed:
+            return PolicyQuestionResult(
+                status="success",
+                data=reviewed,
+                policy_references=reviewed.policy_references,
+            )
         if not hasattr(self.provider, "explain"):
             return _result(intent.type, "unavailable", "POLICY_MODEL_UNAVAILABLE")
         # Only text from the customer's current message is sent: the model-isolated

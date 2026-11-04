@@ -55,6 +55,8 @@ class CatalogData(Contract):
     products: tuple[ProductQuote, ...]
     total_matches: PositiveInt | None = None
     guide: CatalogGuide | None = None
+    # Stated before the products, such as a promotion that is not active (§7.3).
+    notice: Text | None = None
 
 
 class OrderData(Contract):

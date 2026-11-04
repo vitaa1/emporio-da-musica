@@ -676,10 +676,20 @@
         "expected": [
           {
             "operation": "product_search",
-            "status": "not_found"
+            "status": "success"
           }
         ],
-        "manual_review": null
+        "manual_review": "Says there is no active promotion and shows the current price (manual 7.3)."
+      },
+      {
+        "message": "a promoção de black friday ainda está valendo?",
+        "expected": [
+          {
+            "operation": "product_search",
+            "status": "success"
+          }
+        ],
+        "manual_review": "Says Black Friday is not active before listing other promotions (manual 7.3)."
       }
     ]
   },

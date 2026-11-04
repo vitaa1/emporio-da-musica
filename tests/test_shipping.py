@@ -200,7 +200,7 @@ def test_selected_product_and_destination_carry_over(app):
     ],
 )
 def test_failed_quote_is_reported_before_asking_destination(app, fields, reason):
-    priced(app, "300.00")
+    priced(app, "150.00")
     intent = named(quantity=1, payment_method="pix") | fields
     response = turn(app, intent)
     assert response.results[-1].reason_code == reason

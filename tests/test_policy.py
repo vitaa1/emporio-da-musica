@@ -510,6 +510,6 @@ def test_warranty_summary_does_not_promise_manufacturer_specific_duration(app):
     response = turn(
         app, policy(), message="Qual é a garantia do fabricante do Yamaha C40?"
     )
-    assert "2 anos" not in response.text
-    assert "certificado" in response.text
+    assert "Esse fabricante" not in response.text
+    assert "6 meses a 2 anos" in response.text and "certificado" in response.text
     assert response.results[0].policy_references == ("8.1", "8.2", "8.3")

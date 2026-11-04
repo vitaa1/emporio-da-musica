@@ -10,9 +10,12 @@ from .data.records import Snapshot
 MAX_CATALOG_RESULTS = 10
 PIX_DISCOUNT_PERCENT = Decimal("5")  # Supplied manual §3.
 CENT = Decimal("0.01")
-# Supplied manual §3.1: (first count, last count, minimum installment). The 2–3
-# band's minimum wording is ambiguous and requires confirmation instead.
+# Supplied manual §3.1: (first count, last count, minimum installment).
 INSTALLMENT_BANDS = ((4, 6, Decimal("80")), (7, 12, Decimal("100")))
+# The 2–3 band's wording is ambiguous (no minimum, "except below BRL 50") and the §3
+# table says BRL 100. An installment of at least BRL 100 satisfies every reading.
+SMALL_BAND_SAFE_MINIMUM = Decimal("100")
+COMBINED_PAYMENT_MINIMUM = Decimal("2000")  # Supplied manual §3.1.
 INSTALLMENT_MINIMUM_NOT_MET = "Requested installments do not meet the minimum."
 
 
@@ -34,6 +37,14 @@ def max_installments(total: Decimal) -> int | None:
     """Largest count in the unambiguous bands whose installments meet the minimum."""
     for count in range(12, 3, -1):
         if split_installments(total, count)[0] >= installment_minimum(count):
+            return count
+    return None
+
+
+def max_small_installments(total: Decimal) -> int | None:
+    """Largest of 3 and 2 installments that every reading of §3.1 allows."""
+    for count in (3, 2):
+        if split_installments(total, count)[0] >= SMALL_BAND_SAFE_MINIMUM:
             return count
     return None
 
@@ -79,13 +90,40 @@ def quote_product(
     return _search(snapshot, intent, product_id=product_id)
 
 
+def _combined_payment(snapshot, intent, product_id):
+    """State the §3.1 threshold; a split and its discounts stay for the store."""
+    reason = "COMBINED_PAYMENT_REQUIRES_CONFIRMATION"
+    priced = _search(
+        snapshot,
+        intent.model_copy(update={"payment_method": None, "installments": None}),
+        product_id=product_id,
+    )
+    if priced.status == "not_found":
+        return priced
+    single = (
+        priced.data.products[0]
+        if priced.status == "success" and len(priced.data.products) == 1
+        else None
+    )
+    if single and single.availability != "available":
+        return priced  # Stock and status come before any payment condition.
+    # A refusal needs the real quantity; "above" excludes exactly the threshold.
+    if (
+        single
+        and intent.quantity is not None
+        and single.final_total_brl <= COMBINED_PAYMENT_MINIMUM
+    ):
+        reason = "COMBINED_PAYMENT_BELOW_MINIMUM"
+    return ProductSearchResult(
+        status="requires_confirmation",
+        reason_code=reason,
+        policy_references=("3.1",),
+    )
+
+
 def _search(snapshot, intent, *, product_id=None):
     if intent.payment_method == "combined":
-        return ProductSearchResult(
-            status="requires_confirmation",
-            reason_code="COMBINED_PAYMENT_REQUIRES_CONFIRMATION",
-            policy_references=("3",),
-        )
+        return _combined_payment(snapshot, intent, product_id)
     if intent.installments is not None:
         if intent.payment_method is None:
             return ProductSearchResult(
@@ -98,12 +136,6 @@ def _search(snapshot, intent, *, product_id=None):
                 status="needs_information",
                 missing_fields=("payment_method", "installments"),
                 reason_code="INCOMPATIBLE_PAYMENT_CONDITIONS",
-            )
-        if 2 <= intent.installments <= 3:
-            return ProductSearchResult(
-                status="requires_confirmation",
-                reason_code="AMBIGUOUS_INSTALLMENT_BAND",
-                policy_references=("3.1",),
             )
 
     quantity = intent.quantity if intent.quantity is not None else 1
@@ -193,6 +225,17 @@ def _search(snapshot, intent, *, product_id=None):
         if intent.payment_method == "credit":
             if installments is None:
                 credit["max_installments"] = max_installments(total)
+            elif 2 <= installments <= 3:
+                base, first = split_installments(total, installments)
+                if base < SMALL_BAND_SAFE_MINIMUM:
+                    return ProductSearchResult(
+                        status="requires_confirmation",
+                        reason_code="AMBIGUOUS_INSTALLMENT_BAND",
+                        policy_references=("3.1",),
+                    )
+                credit["installment_amount_brl"] = base
+                if first != base:
+                    credit["first_installment_brl"] = first
             elif installments >= 4:
                 base, first = split_installments(total, installments)
                 if base >= installment_minimum(installments):

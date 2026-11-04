@@ -20,8 +20,9 @@ WARRANTY_SECTIONS = {"8", "8.1", "8.2", "8.3"}
 WARRANTY_ANSWER = PolicyData(
     answer=(
         "Segundo o manual da loja, a garantia legal é de 90 dias contra defeitos "
-        "de fabricação, contados do recebimento. A garantia adicional do fabricante "
-        "varia; consulte o prazo e as condições no certificado do instrumento. "
+        "de fabricação, contados do recebimento. A maioria dos fabricantes oferece "
+        "garantia própria, que pode variar de 6 meses a 2 anos; o prazo e as "
+        "condições de cada produto estão no certificado do instrumento. "
         "O manual exclui desgaste natural, mau uso, quedas, condições climáticas "
         "extremas, modificações ou reparos não autorizados e danos estéticos que "
         "não afetem o funcionamento. Isso não confirma cobertura de um caso individual."
@@ -69,6 +70,101 @@ HOURS_ANSWER = PolicyData(
     policy_references=("2",),
 )
 
+# Whether a campaign is running comes from promotion records, never model prose (§7.3).
+CAMPAIGN_NAMES = (
+    r"black friday|aniversario da loja|volta as aulas|queima de estoque|"
+    r"semana do musico|liquidacao de inverno|pascoa|oferta especial|desconto exclusivo"
+)
+CAMPAIGN_NAME = re.compile(rf"\b({CAMPAIGN_NAMES})\b")
+
+# Clear general questions answered from reviewed manual text, without the model.
+# Observed live: a small model sends these to product, order, or scope routes.
+_REVIEWED_QUESTIONS = (
+    (
+        r"\baceita\w* (?:\w+ )?(boleto|debito|pix|cartao|credito)\b",
+        "Aceitamos PIX (5% de desconto sobre o preço de tabela, sem somar com "
+        "promoção), cartão de débito, cartão de crédito em até 12x sem juros e boleto "
+        "(compensação em até 3 dias úteis).",
+        ("3",),
+    ),
+    (
+        r"^(em |ate )?quantas (vezes|parcelas)( (posso|da|consigo|pode)( pra| para)?"
+        r"( parcelar| dividir)?)?$|\bcomo funciona o parcelamento\b",
+        "Dá para parcelar em até 12x sem juros, conforme o valor: de 4x a 6x a parcela "
+        "mínima é de R$ 80,00 e de 7x a 12x é de R$ 100,00. Em 2x ou 3x, parcela a "
+        "partir de R$ 100,00 está ok; abaixo disso, precisa de confirmação da loja. "
+        "Me diga o instrumento e eu calculo.",
+        ("3.1",),
+    ),
+    (
+        r"^(?!.*\bdefeito\b).*\b(como|quando|prazo)\b.*\breembolso\b",
+        "No arrependimento de compra online, o reembolso é feito na mesma forma de "
+        "pagamento original, em até 10 dias úteis.",
+        ("4.1",),
+    ),
+    (
+        r"\bfrete\b.*\bdevolucao\b",
+        "No arrependimento de compra online, o frete de devolução é por conta da loja. "
+        "O manual não define esse custo para outros casos.",
+        ("4.1",),
+    ),
+    (
+        r"\bboquilhas?\b.*\b(troc\w*|devol\w*)|\b(troc\w*|devol\w*)\b.*\bboquilhas?\b",
+        "Boquilhas de instrumentos de sopro não são elegíveis para troca, por questões "
+        "de higiene.",
+        ("4.4",),
+    ),
+    (
+        r"\bcomo funciona o frete\b|\bfrete\b.*\b(outras? cidades?|outros? estados?)\b",
+        "Na região metropolitana de Campo Grande, o frete é grátis acima de R$ 500,00 "
+        "e custa R$ 35,00 abaixo disso, com entrega em 1 a 3 dias úteis. Para outras "
+        "cidades, enviamos por PAC, SEDEX ou Jadlog, com valor calculado pelo CEP, pelo "
+        "peso e pelas dimensões do produto.",
+        ("5.1", "5.2"),
+    ),
+    (
+        r"\b(prazo|demora\w*|quanto tempo|quantos dias)\b.*\b(sedex|pac|jadlog)\b"
+        r"|\b(sedex|pac|jadlog)\b.*\b(prazo|demora\w*|quanto tempo|quantos dias)\b",
+        "Para fora da região metropolitana de Campo Grande, os prazos estimados são: "
+        "PAC, 5 a 12 dias úteis; SEDEX, 2 a 5; Jadlog, 3 a 8. Todos têm rastreamento e "
+        "seguro incluído. O valor depende do CEP, do peso e das dimensões do produto.",
+        ("5.2",),
+    ),
+    (
+        r"^(?!.*\b(troc\w*|devol\w*|reembolso|ontem|hoje)\b).*"
+        r"(\b(chegou|veio)\b.*\b(avariad\w*|danificad\w*|amassad\w*)\b|\bavaria\b)",
+        "Em caso de avaria no transporte, recuse o recebimento e entre em contato "
+        "imediatamente com a loja. Todos os envios têm seguro contra extravios e danos.",
+        ("5.2",),
+    ),
+    (
+        r"\b(segura|seguram|segurar|reserva|reservam|reservar|mantem|manter) o preco\b"
+        r"|\brain check\b",
+        "Não: promoções dependem do estoque, e produto esgotado durante a promoção não "
+        "dá direito a reserva de preço.",
+        ("6.2",),
+    ),
+    (
+        r"\bquando (e|sera|acontece|vai ser|tem|comeca) (a |o )?(black friday|aniversario da loja|volta as aulas"
+        r"|semana do musico)\b",
+        "As campanhas costumam ser: Volta às Aulas em fevereiro, Aniversário da Loja "
+        "em agosto, Black Friday em novembro e Semana do Músico na semana de 22 de "
+        "novembro. Isso não indica promoção ativa agora; posso listar as que estão "
+        "valendo.",
+        ("6.1",),
+    ),
+    (
+        r"\b(excluir|exclusao|apagar|deletar|remover)\b.*\bdados\b",
+        "Você pode pedir a exclusão dos seus dados a qualquer momento pelo WhatsApp ou "
+        "e-mail da loja. Eu não consigo fazer isso por aqui, então nada foi excluído.",
+        ("9",),
+    ),
+)
+REVIEWED_QUESTIONS = tuple(
+    (re.compile(pattern), PolicyData(answer=answer, policy_references=references))
+    for pattern, answer, references in _REVIEWED_QUESTIONS
+)
+
 MAX_POLICY_ANSWER = 1000
 DEFAULT_MANUAL = Path(__file__).with_name("store_manual.txt")
 
@@ -110,6 +206,25 @@ class PolicyAnswerError(ValueError):
 
 class ContactConflict(ValueError):
     """The answer depends on contacts that the manual states inconsistently."""
+
+
+def reviewed_question_answer(message: str) -> PolicyData | None:
+    """A reviewed answer for one clear general question; never for a specific quote."""
+    folded = "".join(
+        c
+        for c in unicodedata.normalize("NFD", message.casefold())
+        if not unicodedata.combining(c)
+    )
+    text = " ".join(folded.split()).strip(" ?!.")
+    if "?" in text or re.search(r"[0-9]", text):
+        return None  # Several questions, or a product, quantity, or order number.
+    if re.search(r"\bnao\b", text):
+        return None
+    personal = re.search(r"\b(meu|minha|meus|minhas)\b", text)  # An individual case.
+    for pattern, answer in REVIEWED_QUESTIONS:
+        if pattern.search(text) and (not personal or "9" in answer.policy_references):
+            return answer
+    return None
 
 
 def _numbers(text: str) -> set[int]:
@@ -182,4 +297,10 @@ def explain_policy(
         raise PolicyAnswerError("Policy answer contains unsupported numbers")
     if set(data.policy_references) <= WARRANTY_SECTIONS:
         return WARRANTY_ANSWER
-    return _reviewed_answer(question, data.policy_references) or data
+    reviewed = _reviewed_answer(question, data.policy_references)
+    if reviewed:
+        return reviewed
+    if CAMPAIGN_NAME.search(folded):
+        # Whether a campaign runs comes from promotion records, never model prose.
+        return reviewed_question_answer("quando e a black friday")
+    return data
