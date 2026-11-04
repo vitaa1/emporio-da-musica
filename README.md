@@ -6,7 +6,11 @@ The main design decision is that **the model only interprets; Python decides**. 
 
 ## Quick start
 
-Requirements: Python 3.13 and, for natural-language mode, [Ollama](https://ollama.com/). No API key or paid service is needed.
+You need [Python 3.13](https://www.python.org/downloads/) and [Ollama](https://ollama.com/download). No API key or paid service is needed. The model download is about 2 GB.
+
+**1. Get the code and install the dependencies**
+
+Linux or macOS:
 
 ```sh
 git clone https://github.com/vitaa1/emporio-da-musica.git
@@ -15,18 +19,44 @@ python3.13 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-On Windows, create the environment with `py -3.13 -m venv .venv` and use `.\.venv\Scripts\python.exe` in the commands below. To install Python 3.13 with uv, see the [development guide](docs/DEVELOPMENT.md).
+Windows (PowerShell):
 
-### Run with the local model
+```powershell
+git clone https://github.com/vitaa1/emporio-da-musica.git
+cd emporio-da-musica
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+**2. Download the model** (with Ollama running)
 
 ```sh
 ollama pull qwen2.5:3b
-.venv/bin/python -m emporio_da_musica.cli --customer-id 3
 ```
 
-On WSL with Ollama running on Windows, `localhost` does not reach the server: add the `--ollama-url` shown under [Configuration](#configuration). The agent warns at startup when it cannot reach the server or the model is not installed.
+**3. Start the agent**
 
-Then try:
+Linux or macOS:
+
+```sh
+.venv/bin/python -m emporio_da_musica.cli
+```
+
+Windows (PowerShell):
+
+```powershell
+.\.venv\Scripts\python.exe -m emporio_da_musica.cli
+```
+
+If the agent runs in WSL and Ollama runs on Windows, `localhost` does not reach the server, so pass its address:
+
+```sh
+.venv/bin/python -m emporio_da_musica.cli --ollama-url "http://$(ip route | awk '/default/{print $3}'):11434"
+```
+
+The agent warns at startup if it cannot reach Ollama or the model is not installed. Type `/sair` to exit.
+
+**4. Try a conversation**
 
 ```text
 Quero comprar um violão
@@ -34,15 +64,22 @@ Yamaha
 Quero o segundo
 2 unidades no pix
 E em 10 vezes no crédito?
-Consulte meu pedido 1
 Qual o horário de sábado?
 ```
 
 A broad request gets a question about brand or budget. A list shows names and prices, and a chosen model shows its stock, unit price, and every payment option.
 
+### Check an order
+
+`--customer-id` is optional. It simulates a logged-in customer and is only needed for order lookups. Customer 3 owns order 1 in the demo data. Add it to the command from step 3, then ask `Consulte meu pedido 1`:
+
+```sh
+.venv/bin/python -m emporio_da_musica.cli --customer-id 3
+```
+
 ### Run without a model
 
-The offline mode uses explicit commands and does not interpret natural language. It is useful for checking the rules without Ollama:
+The offline mode needs no Ollama. It uses explicit commands and does not interpret natural language, so it only checks the rules:
 
 ```sh
 .venv/bin/python -m emporio_da_musica.cli --demo --customer-id 3
@@ -70,13 +107,7 @@ Other commands are listed when the session starts.
 
 Flags override environment variables. `.env` files are not loaded automatically; `.env.example` lists the variables to export.
 
-When Ollama runs on Windows and the agent runs in WSL, use the Windows host address rather than `localhost`:
-
-```sh
-.venv/bin/python -m emporio_da_musica.cli --ollama-url "http://$(ip route | awk '/default/{print $3}'):11434"
-```
-
-Ollama must accept connections from WSL for this to work. Keep the server restricted to the intended machine or network.
+For the WSL address shown in the Quick start to work, Ollama on Windows must accept connections from WSL. Keep the server restricted to the intended machine or network.
 
 ## Data
 
@@ -172,7 +203,7 @@ The manual is ambiguous or incomplete in several places. The prototype handles t
 
 The 535 deterministic tests need no model or credentials. They run in CI on Linux, Windows, and macOS.
 
-On 2026-11-03, a clean copy of this documentation's working tree was verified on WSL2 with Python 3.13 in a new virtual environment: installing the pins, the data validation, the offline commands, and the model example under Quick start all worked, as did the checks above. A single example run does not guarantee identical model output later.
+On 2026-11-03, a clean copy of this documentation's working tree was verified on WSL2 with Python 3.13 in a new virtual environment: installing the pins, the data validation, the offline commands, and the model example under Quick start all worked, as did the checks above. The Quick start's PowerShell commands were also run manually on Windows with a fresh clone. A single example run does not guarantee identical model output later.
 
 Model behavior is evaluated separately, because it depends on a local server and is not deterministic:
 
