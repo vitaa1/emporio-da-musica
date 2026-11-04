@@ -13,9 +13,9 @@ The repository contains development tooling, an in-memory CSV loader, typed Pyda
 - `pyproject.toml`: Python `>=3.13,<3.14`, metadata, and direct dependencies.
 - `requirements.txt` and `requirements-dev.txt`: generated runtime and development pins.
 - `.github/workflows/ci.yml`: cross-platform setup checks.
-- `README.md`: submission overview; `docs/DEVELOPMENT.md`: contributor setup; `docs/BEHAVIOR.md`: feature conventions; `CONTEXT.md`: historical context and current handoff. Verify snapshots against actual files.
+- `README.md`: submission overview and development setup; `docs/ARCHITECTURE.md`: design, policy decisions, contracts, and feature behavior; `docs/EVALUATION.md`: live results. Verify snapshots against actual files.
 
-Before implementing, read [architecture](docs/ARCHITECTURE.md) and [contracts](docs/CONTRACT.md). Consult [milestones and issues](docs/GITHUB_PLAN.md) for scope and dependencies. Distinguish approved directions from proposed defaults and unresolved policies. Update documentation when behavior changes; do not duplicate detailed contracts here.
+Before implementing, read [architecture](docs/ARCHITECTURE.md). Distinguish approved directions from proposed defaults and unresolved policies. Update documentation when behavior changes; do not duplicate detailed contracts here.
 
 ## Architecture & Implementation Boundaries
 
@@ -39,7 +39,7 @@ python3.13 -m venv .venv
 .venv/bin/python -m pytest -q
 ```
 
-Create `.venv` only when absent. Follow `docs/DEVELOPMENT.md` for pip-tools generation in the Linux/WSL reference environment. Never edit generated pins manually; keep them with declaration changes. Regenerate both runtime and development dependency outputs when declarations change.
+Create `.venv` only when absent. Follow the README's Development section for pip-tools generation in the Linux/WSL reference environment. Never edit generated pins manually; keep them with declaration changes. Regenerate both runtime and development dependency outputs when declarations change.
 
 ## Style & Validation
 
@@ -50,5 +50,7 @@ EditorConfig and Ruff are configured; Ruff checks basic errors and import order 
 ## Contributions & Local Configuration
 
 Use `docs:`, `chore:`, or `ci:` where appropriate. Create a focused issue branch before any new feature or task; never develop directly on main. Use a descriptive branch name without issue numbers (for example, `feature/csv-loader`). Use descriptive PR titles without planning codes such as P05; describe behavior, verification, and limitations. Require all three `setup-python-*` checks before merge. Branch creation for new work is authorized by the user. Obtain explicit authorization before installing tools or performing other Git mutations.
+
+Do not add AI attribution to commits or PRs; AI usage is disclosed in the README. Before committing feature work, the user may request the `code_reviewer` and `security_reviewer` roles (`.codex/agents/`) and the `diagnosing-bugs` skill (`.agents/skills/`) on the diff; verify findings, fix confirmed ones with regression tests, and rerun live checks. Windows-hosted Ollama is reached from WSL at the Windows host address (`ip route | awk '/default/{print $3}'`), not `localhost`.
 
 Keep secrets, environments, backups, and unnecessary customer data out of commits/logs. Commit only nonsecret `.env.example` values. Keep Windows and Linux environments separate.

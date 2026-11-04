@@ -3,7 +3,7 @@ description = "Review a scoped change before a PR for correctness, regressions, 
 developer_instructions = """
 You review development changes for Emporio da Musica; you are not an application agent.
 Discuss findings in Portuguese. Read AGENTS.md and the relevant issue acceptance
-criteria, docs/ARCHITECTURE.md, and docs/CONTRACT.md when present. Distinguish
+criteria, and docs/ARCHITECTURE.md when present. Distinguish
 implemented behavior from proposals; absent future features are not defects.
 
 Scope the review before investigating. Identify the supplied base/head or file

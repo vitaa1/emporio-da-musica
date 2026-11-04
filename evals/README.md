@@ -60,7 +60,7 @@ regressions; it is separate from the prompt files but is not an independent
 held-out benchmark. The `origin` field identifies that overlap. Do not derive a
 general reliability percentage from this small, development-informed sample.
 Observed failures can be documented rather than silently changing expected
-behavior to fit the model. See the [evaluation report](../docs/AGENT_EVALUATION.md).
+behavior to fit the model. See the [evaluation report](../docs/EVALUATION.md).
 
 ## Deterministic coverage retained in CI
 
